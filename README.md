@@ -1,4 +1,4 @@
-# SPVM::Resource::Re2::V2022_06_01
+# SPVM::Resource::RE2
 
-SPVM::Resource::Re2::V2022_06_01 is a SPVM module.
+<a href="https://metacpan.org/pod/SPVM::Resource::RE2">SPVM::Resource::RE2</a>
 
