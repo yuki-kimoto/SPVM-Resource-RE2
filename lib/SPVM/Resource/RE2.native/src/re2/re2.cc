@@ -71,31 +71,6 @@ int Regexp::Ref() {
   return (*ref_map())[this];
 }
 
-// Increments reference count, returns object as convenience.
-Regexp* Regexp::Incref() {
-  if (ref_ >= kMaxRef-1) {
-    static std::once_flag ref_once;
-    std::call_once(ref_once, []() {
-      (void) new (ref_storage) RefStorage;
-    });
-
-    // Store ref count in overflow map.
-    MutexLock l(ref_mutex());
-    if (ref_ == kMaxRef) {
-      // already overflowed
-      (*ref_map())[this]++;
-    } else {
-      // overflowing now
-      (*ref_map())[this] = kMaxRef;
-      ref_ = kMaxRef;
-    }
-    return this;
-  }
-
-  ref_++;
-  return this;
-}
-
 // Decrements reference count and deletes this object if count reaches 0.
 void Regexp::Decref() {
   if (ref_ == kMaxRef) {
