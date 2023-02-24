@@ -1371,7 +1371,6 @@ inline bool DFA::InlinedSearchLoop(SearchParams* params) {
       // In start state, only way out is to find the prefix,
       // so we use prefix accel (e.g. memchr) to skip ahead.
       // If not found, we can skip to the end of the string.
-      p = BytePtr(prog_->PrefixAccel(p, ep - p));
       if (p == NULL) {
         p = ep;
         break;
