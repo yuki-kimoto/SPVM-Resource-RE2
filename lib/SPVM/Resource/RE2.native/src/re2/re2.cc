@@ -657,64 +657,6 @@ class Regexp {
 // Character class set: contains non-overlapping, non-abutting RuneRanges.
 typedef std::set<RuneRange, RuneRangeLess> RuneRangeSet;
 
-class CharClassBuilder {
- public:
-  CharClassBuilder();
-
-  typedef RuneRangeSet::iterator iterator;
-  iterator begin() { return ranges_.begin(); }
-  iterator end() { return ranges_.end(); }
-
-  int size() { return nrunes_; }
-  bool empty() { return nrunes_ == 0; }
-  bool full() { return nrunes_ == Runemax+1; }
-
-  bool Contains(Rune r);
-  bool FoldsASCII();
-  bool AddRange(Rune lo, Rune hi);  // returns whether class changed
-  CharClassBuilder* Copy();
-  void AddCharClass(CharClassBuilder* cc);
-  void Negate();
-  void RemoveAbove(Rune r);
-  CharClass* GetCharClass();
-  void AddRangeFlags(Rune lo, Rune hi, Regexp::ParseFlags parse_flags);
-
- private:
-  static const uint32_t AlphaMask = (1<<26) - 1;
-  uint32_t upper_;  // bitmap of A-Z
-  uint32_t lower_;  // bitmap of a-z
-  int nrunes_;
-  RuneRangeSet ranges_;
-
-  CharClassBuilder(const CharClassBuilder&) = delete;
-  CharClassBuilder& operator=(const CharClassBuilder&) = delete;
-};
-
-// Bitwise ops on ParseFlags produce ParseFlags.
-inline Regexp::ParseFlags operator|(Regexp::ParseFlags a,
-                                    Regexp::ParseFlags b) {
-  return static_cast<Regexp::ParseFlags>(
-      static_cast<int>(a) | static_cast<int>(b));
-}
-
-inline Regexp::ParseFlags operator^(Regexp::ParseFlags a,
-                                    Regexp::ParseFlags b) {
-  return static_cast<Regexp::ParseFlags>(
-      static_cast<int>(a) ^ static_cast<int>(b));
-}
-
-inline Regexp::ParseFlags operator&(Regexp::ParseFlags a,
-                                    Regexp::ParseFlags b) {
-  return static_cast<Regexp::ParseFlags>(
-      static_cast<int>(a) & static_cast<int>(b));
-}
-
-inline Regexp::ParseFlags operator~(Regexp::ParseFlags a) {
-  // Attempting to produce a value out of enum's range has undefined behaviour.
-  return static_cast<Regexp::ParseFlags>(
-      ~static_cast<int>(a) & static_cast<int>(Regexp::AllParseFlags));
-}
-
 }  // namespace re2
 
 #endif  // RE2_REGEXP_H_
