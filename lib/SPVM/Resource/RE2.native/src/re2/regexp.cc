@@ -260,7 +260,6 @@ Regexp* Regexp::ConcatOrAlternate(RegexpOp op, Regexp** sub, int nsub,
     subcopy = PODArray<Regexp*>(nsub);
     memmove(subcopy.data(), sub, nsub * sizeof sub[0]);
     sub = subcopy.data();
-    nsub = FactorAlternation(sub, nsub, flags);
     if (nsub == 1) {
       Regexp* re = sub[0];
       return re;
