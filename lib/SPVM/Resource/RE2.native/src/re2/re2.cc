@@ -80,77 +80,6 @@ typedef std::mutex MutexType;
 #ifndef RE2_REGEXP_H_
 #define RE2_REGEXP_H_
 
-// Regular expression library: parsing, execution, and manipulation
-// of regular expressions.
-//
-// Any operation that traverses the Regexp structures should be written
-// using Regexp::Walker (see walker-inl.h), not recursively, because deeply nested
-// regular expressions such as x++++++++++++++++++++... might cause recursive
-// traversals to overflow the stack.
-//
-// It is the caller's responsibility to provide appropriate mutual exclusion
-// around manipulation of the regexps.  RE2 does this.
-//
-// PARSING
-//
-// Regexp::Parse parses regular expressions encoded in UTF-8.
-// The default syntax is POSIX extended regular expressions,
-// with the following changes:
-//
-//   1.  Backreferences (optional in POSIX EREs) are not supported.
-//         (Supporting them precludes the use of DFA-based
-//          matching engines.)
-//
-//   2.  Collating elements and collation classes are not supported.
-//         (No one has needed or wanted them.)
-//
-// The exact syntax accepted can be modified by passing flags to
-// Regexp::Parse.  In particular, many of the basic Perl additions
-// are available.  The flags are documented below (search for LikePerl).
-//
-// If parsed with the flag Regexp::Latin1, both the regular expression
-// and the input to the matching routines are assumed to be encoded in
-// Latin-1, not UTF-8.
-//
-// EXECUTION
-//
-// Once Regexp has parsed a regular expression, it provides methods
-// to search text using that regular expression.  These methods are
-// implemented via calling out to other regular expression libraries.
-// (Let's call them the sublibraries.)
-//
-// To call a sublibrary, Regexp does not simply prepare a
-// string version of the regular expression and hand it to the
-// sublibrary.  Instead, Regexp prepares, from its own parsed form, the
-// corresponding internal representation used by the sublibrary.
-// This has the drawback of needing to know the internal representation
-// used by the sublibrary, but it has two important benefits:
-//
-//   1. The syntax and meaning of regular expressions is guaranteed
-//      to be that used by Regexp's parser, not the syntax expected
-//      by the sublibrary.  Regexp might accept a restricted or
-//      expanded syntax for regular expressions as compared with
-//      the sublibrary.  As long as Regexp can translate from its
-//      internal form into the sublibrary's, clients need not know
-//      exactly which sublibrary they are using.
-//
-//   2. The sublibrary parsers are bypassed.  For whatever reason,
-//      sublibrary regular expression parsers often have security
-//      problems.  For example, plan9grep's regular expression parser
-//      has a buffer overflow in its handling of large character
-//      classes, and PCRE's parser has had buffer overflow problems
-//      in the past.  Security-team requires sandboxing of sublibrary
-//      regular expression parsers.  Avoiding the sublibrary parsers
-//      avoids the sandbox.
-//
-// The execution methods we use now are provided by the compiled form,
-// Prog, described in prog.h
-//
-// MANIPULATION
-//
-// Unlike other regular expression libraries, Regexp makes its parsed
-// form accessible to clients, so that client code can analyze the
-// parsed regular expressions.
 
 namespace re2 {
 
@@ -184,9 +113,6 @@ class RegexpStatus {
   RegexpStatus(const RegexpStatus&) = delete;
   RegexpStatus& operator=(const RegexpStatus&) = delete;
 };
-
-// Compiled form; see prog.h
-class Prog;
 
 class Regexp {
  public:
@@ -307,19 +233,6 @@ class Regexp {
   // Helper traversal class, defined fully in walker-inl.h.
   template<typename T> class Walker;
 
-  // Compile to Prog.  See prog.h
-  // Reverse prog expects to be run over text backward.
-  // Construction and execution of prog will
-  // stay within approximately max_mem bytes of memory.
-  // If max_mem <= 0, a reasonable default is used.
-  Prog* CompileToProg(int64_t max_mem);
-  Prog* CompileToReverseProg(int64_t max_mem);
-
-  // Whether to expect this library to find exactly the same answer as PCRE
-  // when running this regexp.  Most regexps do mimic PCRE exactly, but a few
-  // obscure cases behave differently.  Technically this is more a property
-  // of the Prog than the Regexp, but the computation is much easier to do
-  // on the Regexp.  See mimics_pcre.cc for the exact conditions.
   bool MimicsPCRE();
 
   // Benchmarking function.
@@ -661,7 +574,6 @@ class Regexp {
 // will leave 64 in a, b, c, and d.
 
 namespace re2 {
-class Prog;
 class Regexp;
 }  // namespace re2
 
@@ -752,12 +664,6 @@ class RE2 {
   // If RE2 could not be created properly, returns the offending
   // portion of the regexp.
   const std::string& error_arg() const { return *error_arg_; }
-
-  // If histogram is not null, outputs the program fanout
-  // as a histogram bucketed by powers of 2.
-  // Returns the number of the largest non-empty bucket.
-  int ProgramFanout(std::vector<int>* histogram) const;
-  int ReverseProgramFanout(std::vector<int>* histogram) const;
 
   // Returns the underlying Regexp; not for general use.
   // Returns entire_regexp_ so that callers don't need
@@ -901,33 +807,6 @@ class RE2 {
     //   word_boundary    (false) allow Perl's \b \B (word boundary and not)
     //   one_line         (false) ^ and $ only match beginning and end of text
     //
-    // The max_mem option controls how much memory can be used
-    // to hold the compiled form of the regexp (the Prog) and
-    // its cached DFA graphs.  Code Search placed limits on the number
-    // of Prog instructions and DFA states: 10,000 for both.
-    // In RE2, those limits would translate to about 240 KB per Prog
-    // and perhaps 2.5 MB per DFA (DFA state sizes vary by regexp; RE2 does a
-    // better job of keeping them small than Code Search did).
-    // Each RE2 has two Progs (one forward, one reverse), and each Prog
-    // can have two DFAs (one first match, one longest match).
-    // That makes 4 DFAs:
-    //
-    //   forward, first-match    - used for UNANCHORED or ANCHOR_START searches
-    //                               if opt.longest_match() == false
-    //   forward, longest-match  - used for all ANCHOR_BOTH searches,
-    //                               and the other two kinds if
-    //                               opt.longest_match() == true
-    //   reverse, first-match    - never used
-    //   reverse, longest-match  - used as second phase for unanchored searches
-    //
-    // The RE2 memory budget is statically divided between the two
-    // Progs and then the DFAs: two thirds to the forward Prog
-    // and one third to the reverse Prog.  The forward Prog gives half
-    // of what it has left over to each of its DFAs.  The reverse Prog
-    // gives it all to its longest-match DFA.
-    //
-    // Once a DFA fills its budget, it flushes its cache and starts over.
-    // If this happens too often, RE2 falls back on the NFA implementation.
 
     // For now, make the default budget something close to Code Search.
     static const int kDefaultMaxMem = 8<<20;
@@ -1034,8 +913,6 @@ class RE2 {
  private:
   void Init(const StringPiece& pattern, const Options& options);
 
-  re2::Prog* ReverseProg() const;
-
   // First cache line is relatively cold fields.
   const std::string* pattern_;    // string regular expression
   Options options_;               // option flags
@@ -1052,11 +929,7 @@ class RE2 {
   bool is_one_pass_ : 1;          // can use prog_->SearchOnePass?
   bool prefix_foldcase_ : 1;      // prefix_ is ASCII case-insensitive
   std::string prefix_;            // required prefix (before suffix_regexp_)
-  re2::Prog* prog_;               // compiled program for regexp
 
-  // Reverse Prog for DFA execution only
-  mutable re2::Prog* rprog_;
-  // Map from capture names to indices
   mutable const std::map<std::string, int>* named_groups_;
   // Map from capture indices to names
   mutable const std::map<int, std::string>* group_names_;
