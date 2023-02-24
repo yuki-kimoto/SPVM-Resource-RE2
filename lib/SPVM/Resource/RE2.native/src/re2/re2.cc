@@ -154,117 +154,30 @@ typedef std::mutex MutexType;
 
 namespace re2 {
 
-// Keep in sync with string list kOpcodeNames[] in testing/dump.cc
-enum RegexpOp {
-  // Matches no strings.
-  kRegexpNoMatch = 1,
-
-  // Matches empty string.
-  kRegexpEmptyMatch,
-
-  // Matches rune_.
-  kRegexpLiteral,
-
-  // Matches runes_.
-  kRegexpLiteralString,
-
-  // Matches concatenation of sub_[0..nsub-1].
-  kRegexpConcat,
-  // Matches union of sub_[0..nsub-1].
-  kRegexpAlternate,
-
-  // Matches sub_[0] zero or more times.
-  kRegexpStar,
-  // Matches sub_[0] one or more times.
-  kRegexpPlus,
-  // Matches sub_[0] zero or one times.
-  kRegexpQuest,
-
-  // Matches sub_[0] at least min_ times, at most max_ times.
-  // max_ == -1 means no upper limit.
-  kRegexpRepeat,
-
-  // Parenthesized (capturing) subexpression.  Index is cap_.
-  // Optionally, capturing name is name_.
-  kRegexpCapture,
-
-  // Matches any character.
-  kRegexpAnyChar,
-
-  // Matches any byte [sic].
-  kRegexpAnyByte,
-
-  // Matches empty string at beginning of line.
-  kRegexpBeginLine,
-  // Matches empty string at end of line.
-  kRegexpEndLine,
-
-  // Matches word boundary "\b".
-  kRegexpWordBoundary,
-  // Matches not-a-word boundary "\B".
-  kRegexpNoWordBoundary,
-
-  // Matches empty string at beginning of text.
-  kRegexpBeginText,
-  // Matches empty string at end of text.
-  kRegexpEndText,
-
-  // Forces match of entire expression right now,
-  // with match ID match_id_ (used by RE2::Set).
-  kRegexpHaveMatch,
-
-  kMaxRegexpOp = kRegexpHaveMatch,
-};
-
-// Keep in sync with string list in regexp.cc
-enum RegexpStatusCode {
-  // No error
-  kRegexpSuccess = 0,
-
-  // Unexpected error
-  kRegexpInternalError,
-
-  // Parse errors
-  kRegexpBadEscape,          // bad escape sequence
-  kRegexpBadCharRange,       // bad character class range
-  kRegexpMissingBracket,     // missing closing ]
-  kRegexpMissingParen,       // missing closing )
-  kRegexpUnexpectedParen,    // unexpected closing )
-  kRegexpTrailingBackslash,  // at end of regexp
-  kRegexpRepeatArgument,     // repeat argument missing, e.g. "*"
-  kRegexpRepeatSize,         // bad repetition argument
-  kRegexpRepeatOp,           // bad repetition operator
-  kRegexpBadPerlOp,          // bad perl operator
-  kRegexpBadUTF8,            // invalid UTF-8 in regexp
-  kRegexpBadNamedCapture,    // bad named capture
-};
-
 // Error status for certain operations.
 class RegexpStatus {
  public:
-  RegexpStatus() : code_(kRegexpSuccess), tmp_(NULL) {}
   ~RegexpStatus() { delete tmp_; }
 
-  void set_code(RegexpStatusCode code) { code_ = code; }
+  void set_code(int code) { code_ = code; }
   void set_error_arg(const StringPiece& error_arg) { error_arg_ = error_arg; }
   void set_tmp(std::string* tmp) { delete tmp_; tmp_ = tmp; }
-  RegexpStatusCode code() const { return code_; }
+  int code() const { return code_; }
   const StringPiece& error_arg() const { return error_arg_; }
-  bool ok() const { return code() == kRegexpSuccess; }
 
   // Copies state from status.
   void Copy(const RegexpStatus& status);
 
   // Returns text equivalent of code, e.g.:
   //   "Bad character class"
-  static std::string CodeText(RegexpStatusCode code);
+  static std::string CodeText(int code);
 
   // Returns text describing error, e.g.:
   //   "Bad character class: [z-a]"
   std::string Text() const;
 
  private:
-  RegexpStatusCode code_;  // Kind of error
+  int code_;  // Kind of error
   StringPiece error_arg_;  // Piece of regexp containing syntax error.
   std::string* tmp_;       // Temporary storage, possibly where error_arg_ is.
 
@@ -331,13 +244,9 @@ class Regexp {
     LikePerl      = ClassNL | OneLine | PerlClasses | PerlB | PerlX |
                     UnicodeGroups,
 
-    // Internal use only.
-    WasDollar     = 1<<13,  // on kRegexpEndText: was $ in regexp text
     AllParseFlags = (1<<14)-1,
   };
 
-  // Get.  No set, Regexps are logically immutable once created.
-  RegexpOp op() { return static_cast<RegexpOp>(op_); }
   int nsub() { return nsub_; }
   bool simple() { return simple_ != 0; }
   ParseFlags parse_flags() { return static_cast<ParseFlags>(parse_flags_); }
@@ -349,15 +258,6 @@ class Regexp {
     else
       return submany_;
   }
-
-  int min() { DCHECK_EQ(op_, kRegexpRepeat); return min_; }
-  int max() { DCHECK_EQ(op_, kRegexpRepeat); return max_; }
-  Rune rune() { DCHECK_EQ(op_, kRegexpLiteral); return rune_; }
-  int cap() { DCHECK_EQ(op_, kRegexpCapture); return cap_; }
-  const std::string* name() { DCHECK_EQ(op_, kRegexpCapture); return name_; }
-  Rune* runes() { DCHECK_EQ(op_, kRegexpLiteralString); return runes_; }
-  int nrunes() { DCHECK_EQ(op_, kRegexpLiteralString); return nrunes_; }
-  int match_id() { DCHECK_EQ(op_, kRegexpHaveMatch); return match_id_; }
 
   // Increments reference count, returns object as convenience.
   Regexp* Incref();
@@ -470,7 +370,7 @@ class Regexp {
 
  private:
   // Constructor allocates vectors as appropriate for operator.
-  explicit Regexp(RegexpOp op, ParseFlags parse_flags);
+  explicit Regexp(int op, ParseFlags parse_flags);
 
   // Use Decref() instead of delete to release Regexps.
   // This is private to catch deletes at compile time.
@@ -491,12 +391,12 @@ class Regexp {
 
   // Constructor that generates a Star, Plus or Quest,
   // squashing the pair if sub is also a Star, Plus or Quest.
-  static Regexp* StarPlusOrQuest(RegexpOp op, Regexp* sub, ParseFlags flags);
+  static Regexp* StarPlusOrQuest(int op, Regexp* sub, ParseFlags flags);
 
   // Constructor that generates a concatenation or alternation,
   // enforcing the limit on the number of subexpressions for
   // a particular Regexp.
-  static Regexp* ConcatOrAlternate(RegexpOp op, Regexp** subs, int nsubs,
+  static Regexp* ConcatOrAlternate(int op, Regexp** subs, int nsubs,
                                    ParseFlags flags, bool can_factor);
 
   // Returns the leading string that re starts with.
@@ -522,9 +422,6 @@ class Regexp {
   static int FactorAlternation(Regexp** sub, int nsub, ParseFlags flags);
   friend class FactorAlternationImpl;
 
-  // Is a == b?  Only efficient on regexps that have not been through
-  // Simplify yet - the expansion of a kRegexpRepeat will make this
-  // take a long time.  Do not call on such regexps, hence private.
   static bool Equal(Regexp* a, Regexp* b);
 
   // Allocate space for n sub-regexps.
@@ -542,7 +439,6 @@ class Regexp {
   void Swap(Regexp *that);
 
   // Operator.  See description of operators above.
-  // uint8_t instead of RegexpOp to control space usage.
   uint8_t op_;
 
   // Is this regexp structure already simple
