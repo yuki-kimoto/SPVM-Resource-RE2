@@ -63,14 +63,6 @@ static inline std::map<Regexp*, int>* ref_map() {
   return &reinterpret_cast<RefStorage*>(ref_storage)->ref_map;
 }
 
-int Regexp::Ref() {
-  if (ref_ < kMaxRef)
-    return ref_;
-
-  MutexLock l(ref_mutex());
-  return (*ref_map())[this];
-}
-
 // Decrements reference count and deletes this object if count reaches 0.
 void Regexp::Decref() {
   if (ref_ == kMaxRef) {
