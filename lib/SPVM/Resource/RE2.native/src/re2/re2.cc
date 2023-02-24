@@ -26,7 +26,6 @@
 #include <utility>
 #include <vector>
 
-#include "re2/prog.h"
 #include "re2/regexp.h"
 
 namespace re2 {
