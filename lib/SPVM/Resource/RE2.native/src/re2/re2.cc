@@ -15,18 +15,6 @@
 
 namespace re2 {
 
-// Constructor.  Allocates vectors as appropriate for operator.
-Regexp::Regexp(RegexpOp op, ParseFlags parse_flags)
-  : op_(static_cast<uint8_t>(op)),
-    simple_(false),
-    parse_flags_(static_cast<uint16_t>(parse_flags)),
-    ref_(1),
-    nsub_(0),
-    down_(NULL) {
-  subone_ = NULL;
-  memset(the_union_, 0, sizeof the_union_);
-}
-
 // Destructor.  Assumes already cleaned up children.
 // Private: use Decref() instead of delete to destroy Regexps.
 // Can't call Decref on the sub-Regexps here because
