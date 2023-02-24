@@ -5,15 +5,6 @@
 #ifndef RE2_REGEXP_H_
 #define RE2_REGEXP_H_
 
-// --- SPONSORED LINK --------------------------------------------------
-// If you want to use this library for regular expression matching,
-// you should use re2/re2.h, which provides a class RE2 that
-// mimics the PCRE interface provided by PCRE's C++ wrappers.
-// This header describes the low-level interface used to implement RE2
-// and may change in backwards-incompatible ways from time to time.
-// In contrast, RE2's interface will not.
-// ---------------------------------------------------------------------
-
 // Regular expression library: parsing, execution, and manipulation
 // of regular expressions.
 //
