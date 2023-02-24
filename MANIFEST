@@ -8,7 +8,6 @@
 Changes
 lib/SPVM/Resource/RE2.config
 lib/SPVM/Resource/RE2.native/include/.gitkeep
-lib/SPVM/Resource/RE2.native/include/Makefile
 lib/SPVM/Resource/RE2.native/include/re2/bitmap256.h
 lib/SPVM/Resource/RE2.native/include/re2/filtered_re2.h
 lib/SPVM/Resource/RE2.native/include/re2/fuzzing/compiler-rt/include/fuzzer/FuzzedDataProvider.h
@@ -96,7 +95,6 @@ lib/SPVM/Resource/RE2.native/src/libre2.symbols
 lib/SPVM/Resource/RE2.native/src/libre2.symbols.darwin
 lib/SPVM/Resource/RE2.native/src/LICENSE
 lib/SPVM/Resource/RE2.native/src/Makefile
-lib/SPVM/Resource/RE2.native/src/re2.pc
 lib/SPVM/Resource/RE2.native/src/re2.pc.in
 lib/SPVM/Resource/RE2.native/src/re2/bitmap256.cc
 lib/SPVM/Resource/RE2.native/src/re2/bitmap256.h
