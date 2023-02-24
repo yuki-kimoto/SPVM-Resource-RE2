@@ -402,23 +402,6 @@ const std::map<int, std::string>& RE2::CapturingGroupNames() const {
   return *group_names_;
 }
 
-bool RE2::Extract(const StringPiece& text,
-                  const RE2& re,
-                  const StringPiece& rewrite,
-                  std::string* out) {
-  StringPiece vec[kVecSize];
-  int nvec = 1 + MaxSubmatch(rewrite);
-  if (nvec > 1 + re.NumberOfCapturingGroups())
-    return false;
-  if (nvec > static_cast<int>(arraysize(vec)))
-    return false;
-  if (!re.Match(text, 0, text.size(), UNANCHORED, vec, nvec))
-    return false;
-
-  out->clear();
-  return re.Rewrite(out, rewrite, vec, nvec);
-}
-
 std::string RE2::QuoteMeta(const StringPiece& unquoted) {
   std::string result;
   result.reserve(unquoted.size() << 1);

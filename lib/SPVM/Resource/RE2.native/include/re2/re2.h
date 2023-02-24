@@ -368,19 +368,6 @@ class RE2 {
                            const RE2& re,
                            const StringPiece& rewrite);
 
-  // Like Replace, except that if the pattern matches, "rewrite"
-  // is copied into "out" with substitutions.  The non-matching
-  // portions of "text" are ignored.
-  //
-  // Returns true iff a match occurred and the extraction happened
-  // successfully;  if no match occurs, the string is left unaffected.
-  //
-  // REQUIRES: "text" must not alias any part of "*out".
-  static bool Extract(const StringPiece& text,
-                      const RE2& re,
-                      const StringPiece& rewrite,
-                      std::string* out);
-
   // Escapes all potentially meaningful regexp characters in
   // 'unquoted'.  The returned string, used as a regular expression,
   // will match exactly the original string.  For example,
@@ -459,14 +446,6 @@ class RE2 {
              StringPiece* submatch,
              int nsubmatch) const;
 
-  // Check that the given rewrite string is suitable for use with this
-  // regular expression.  It checks that:
-  //   * The regular expression has enough parenthesized subexpressions
-  //     to satisfy all of the \N tokens in rewrite
-  //   * The rewrite string doesn't have any syntax errors.  E.g.,
-  //     '\' followed by anything other than a digit or '\'.
-  // A true return value guarantees that Replace() and Extract() won't
-  // fail because of a bad rewrite string.
   bool CheckRewriteString(const StringPiece& rewrite,
                           std::string* error) const;
 
