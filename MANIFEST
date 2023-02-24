@@ -38,6 +38,7 @@ lib/SPVM/Resource/RE2.native/src/re2/compile.cc
 lib/SPVM/Resource/RE2.native/src/re2/dfa.cc
 lib/SPVM/Resource/RE2.native/src/re2/make_perl_groups.pl
 lib/SPVM/Resource/RE2.native/src/re2/mimics_pcre.cc
+lib/SPVM/Resource/RE2.native/src/re2/my.cc
 lib/SPVM/Resource/RE2.native/src/re2/nfa.cc
 lib/SPVM/Resource/RE2.native/src/re2/onepass.cc
 lib/SPVM/Resource/RE2.native/src/re2/parse.cc
