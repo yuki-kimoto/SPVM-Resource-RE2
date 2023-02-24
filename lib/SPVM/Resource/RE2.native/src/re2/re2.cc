@@ -23,11 +23,6 @@ namespace re2 {
 Regexp::~Regexp() {
 }
 
-// If it's possible to destroy this regexp without recurring,
-// do so and return true.  Else return false.
-bool Regexp::QuickDestroy() {
-}
-
 // Similar to EmptyStorage in re2.cc.
 struct RefStorage {
   Mutex ref_mutex;
@@ -49,8 +44,6 @@ void Regexp::Decref() {
 
 // Deletes this object; ref count has count reached 0.
 void Regexp::Destroy() {
-  if (QuickDestroy())
-    return;
 
   // Handle recursive Destroy with explicit stack
   // to avoid arbitrarily deep recursion on process stack [sigh].
