@@ -36,13 +36,6 @@
 
 namespace re2 {
 
-// Controls the maximum count permitted by GlobalReplace(); -1 is unlimited.
-static int maximum_global_replace_count = -1;
-
-void RE2::FUZZING_ONLY_set_maximum_global_replace_count(int i) {
-  maximum_global_replace_count = i;
-}
-
 // Maximum number of args we can set
 static const int kMaxArgs = 16;
 static const int kVecSize = 1+kMaxArgs;
