@@ -67,6 +67,12 @@ L<RE2|https://github.com/google/re2> is a regular expression library written by 
 
 See L<SPVM::Document::NativeModule> and L<SPVM::Document::Resource> to write native modules and use resources.
 
+=head1 Resource Version
+
+Google/RE2 C<2023-02-01>.
+
+If a new release exists, it will be upgraded.
+
 =head1 Config
 
 The config of C<Resource::RE2>.
@@ -119,21 +125,28 @@ The config of C<Resource::RE2>.
 
 =back
 
-=head1 Source and Header Files
+=head1 How to Create This Resource
 
-The source and header files are created by the following process.
+=head2 Getting Product
 
-=head2 src
+  mkdir -p original.tmp
+  git clone https://github.com/google/re2.git original.tmp/re2
+  git -C original.tmp/re2 checkout tags/2023-02-01 -b 2023-02-01
+  git -C original.tmp/re2 branch
 
-All files of L<RE2 2022-06-01|https://github.com/google/re2/releases/tag/2022-06-01> are copiedinto C<SPVM/Resource/RE2.native/src>.
+=head2 Source Files
 
-=head2 include
+All files of C<Google/RE2> is copied by the following steps into the C<src> directory.
 
-All header files of L<RE2 2022-06-01|https://github.com/google/re2/releases/tag/2022-06-01> are copied into C<SPVM/Resource/RE2.native/include> in the following command.
+  rsync -av original.tmp/re2/ lib/SPVM/Resource/RE2.native/src/
 
-  rsync -av --include='*/' --include='*.h' --exclude='*' lib/SPVM/Resource/RE2.native/src/ lib/SPVM/Resource/RE2.native/include/
+=head1 Header Files
 
-=head2 Extracting Source Filess
+Header files of C<Google/RE2> is copied into the C<include> directory by the following way.
+
+  rsync -av --include='*/' --include='*.h' --exclude='*' original.tmp/re2/ lib/SPVM/Resource/RE2.native/include/
+
+=head2 Extracting Source Files
 
 The source files that is used in the config are extracted by the following command.
 
