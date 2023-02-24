@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-# Old enough to support Ubuntu Bionic.
-cmake_minimum_required(VERSION 3.10.2)
+# Old enough to support Ubuntu Bionic,
+# but just the MAJOR.MINOR components.
+cmake_minimum_required(VERSION 3.10)
 
 project(RE2 CXX)
 include(CMakePackageConfigHelpers)
@@ -11,15 +12,21 @@ include(CTest)
 include(GNUInstallDirs)
 
 option(BUILD_SHARED_LIBS "build shared libraries" OFF)
-option(USEPCRE "use PCRE in tests and benchmarks" OFF)
+option(RE2_USE_ICU "build against ICU for full Unicode properties support" OFF)
+
+# For historical reasons, this is just "USEPCRE", not "RE2_USE_PCRE".
+option(USEPCRE "build against PCRE for testing and benchmarking" OFF)
 
 # CMake seems to have no way to enable/disable testing per subproject,
 # so we provide an option similar to BUILD_TESTING, but just for RE2.
 option(RE2_BUILD_TESTING "enable testing for RE2" ON)
 
+# The pkg-config Requires: field.
+set(REQUIRES)
+
 # ABI version
 # http://tldp.org/HOWTO/Program-Library-HOWTO/shared-libraries.html
-set(SONAME 9)
+set(SONAME 10)
 
 set(EXTRA_TARGET_LINK_LIBRARIES)
 
@@ -42,9 +49,17 @@ endif()
 if(WIN32)
   add_definitions(-DUNICODE -D_UNICODE -DSTRICT -DNOMINMAX)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)
-elseif(UNIX)
+endif()
+
+if(UNIX)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
+endif()
+
+if(RE2_USE_ICU)
+  find_package(ICU REQUIRED COMPONENTS uc)
+  add_definitions(-DRE2_USE_ICU)
+  list(APPEND REQUIRES icu-uc)
 endif()
 
 if(USEPCRE)
@@ -53,6 +68,7 @@ if(USEPCRE)
 endif()
 
 set(RE2_SOURCES
+    re2/bitmap256.cc
     re2/bitstate.cc
     re2/compile.cc
     re2/dfa.cc
@@ -85,6 +101,10 @@ add_library(re2::re2 ALIAS re2)
 
 if(UNIX)
   target_link_libraries(re2 PUBLIC Threads::Threads)
+endif()
+
+if(RE2_USE_ICU)
+  target_link_libraries(re2 PUBLIC ICU::uc)
 endif()
 
 if(RE2_BUILD_TESTING)
@@ -154,23 +174,30 @@ set(RE2_HEADERS
 
 install(FILES ${RE2_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/re2)
-install(TARGETS re2 EXPORT re2Targets
+install(TARGETS re2
+        EXPORT re2Targets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT re2Targets
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/re2 NAMESPACE re2::)
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/re2
+        NAMESPACE re2::)
 
 configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/re2Config.cmake.in
                               ${CMAKE_CURRENT_BINARY_DIR}/re2Config.cmake
-                              INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/re2
-                              )
+                              INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/re2)
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/re2ConfigVersion.cmake
                                  VERSION ${SONAME}.0.0
-                                 COMPATIBILITY SameMajorVersion
-                                 )
+                                 COMPATIBILITY SameMajorVersion)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/re2Config.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/re2ConfigVersion.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/re2)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/re2.pc.in
+               ${CMAKE_CURRENT_BINARY_DIR}/re2.pc
+               @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/re2.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
