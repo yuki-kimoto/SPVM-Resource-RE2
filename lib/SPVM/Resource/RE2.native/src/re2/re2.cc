@@ -83,37 +83,6 @@ typedef std::mutex MutexType;
 
 namespace re2 {
 
-// Error status for certain operations.
-class RegexpStatus {
- public:
-  ~RegexpStatus() { delete tmp_; }
-
-  void set_code(int code) { code_ = code; }
-  void set_error_arg(const StringPiece& error_arg) { error_arg_ = error_arg; }
-  void set_tmp(std::string* tmp) { delete tmp_; tmp_ = tmp; }
-  int code() const { return code_; }
-  const StringPiece& error_arg() const { return error_arg_; }
-
-  // Copies state from status.
-  void Copy(const RegexpStatus& status);
-
-  // Returns text equivalent of code, e.g.:
-  //   "Bad character class"
-  static std::string CodeText(int code);
-
-  // Returns text describing error, e.g.:
-  //   "Bad character class: [z-a]"
-  std::string Text() const;
-
- private:
-  int code_;  // Kind of error
-  StringPiece error_arg_;  // Piece of regexp containing syntax error.
-  std::string* tmp_;       // Temporary storage, possibly where error_arg_ is.
-
-  RegexpStatus(const RegexpStatus&) = delete;
-  RegexpStatus& operator=(const RegexpStatus&) = delete;
-};
-
 class Regexp {
  public:
 
@@ -175,12 +144,6 @@ class Regexp {
 
   // Decrements reference count and deletes this object if count reaches 0.
   void Decref();
-
-  // Parses string s to produce regular expression, returned.
-  // Caller must release return value with re->Decref().
-  // On failure, sets *status (if status != NULL) and returns NULL.
-  static Regexp* Parse(const StringPiece& s, ParseFlags flags,
-                       RegexpStatus* status);
 
   // Returns a _new_ simplified version of the current regexp.
   // Does not edit the current regexp.
