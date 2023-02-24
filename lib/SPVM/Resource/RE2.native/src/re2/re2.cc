@@ -17,8 +17,65 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <stddef.h>
+#include <stdint.h>
+#include <map>
+#include <set>
+#include <string>
+#include <stddef.h>
+#include <string.h>
+#include <algorithm>
+#include <iosfwd>
+#include <iterator>
+#include <string>
 
+#ifdef __cpp_lib_string_view
+#include <string_view>
+#endif
+
+
+#include "util/util.h"
 #include "util/logging.h"
+#include "util/utf.h"
+#include "re2/stringpiece.h"
+
+#ifdef RE2_NO_THREADS
+#include <assert.h>
+#define MUTEX_IS_LOCK_COUNTER
+#else
+#ifdef _WIN32
+// Requires Windows Vista or Windows Server 2008 at minimum.
+#include <windows.h>
+#if defined(WINVER) && WINVER >= 0x0600
+#define MUTEX_IS_WIN32_SRWLOCK
+#endif
+#else
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <unistd.h>
+#if defined(_POSIX_READER_WRITER_LOCKS) && _POSIX_READER_WRITER_LOCKS > 0
+#define MUTEX_IS_PTHREAD_RWLOCK
+#endif
+#endif
+#endif
+
+#if defined(MUTEX_IS_LOCK_COUNTER)
+typedef int MutexType;
+#elif defined(MUTEX_IS_WIN32_SRWLOCK)
+typedef SRWLOCK MutexType;
+#elif defined(MUTEX_IS_PTHREAD_RWLOCK)
+#include <pthread.h>
+#include <stdlib.h>
+typedef pthread_rwlock_t MutexType;
+#else
+#include <mutex>
+typedef std::mutex MutexType;
+#endif
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
 
 // Copyright 2006 The RE2 Authors.  All Rights Reserved.
 // Use of this source code is governed by a BSD-style
@@ -98,17 +155,6 @@
 // Unlike other regular expression libraries, Regexp makes its parsed
 // form accessible to clients, so that client code can analyze the
 // parsed regular expressions.
-
-#include <stddef.h>
-#include <stdint.h>
-#include <map>
-#include <set>
-#include <string>
-
-#include "util/util.h"
-#include "util/logging.h"
-#include "util/utf.h"
-#include "re2/stringpiece.h"
 
 namespace re2 {
 
@@ -698,16 +744,6 @@ inline Regexp::ParseFlags operator~(Regexp::ParseFlags a) {
 //
 // Arghh!  I wish C++ literals were "string".
 
-#include <stddef.h>
-#include <string.h>
-#include <algorithm>
-#include <iosfwd>
-#include <iterator>
-#include <string>
-#ifdef __cpp_lib_string_view
-#include <string_view>
-#endif
-
 namespace re2 {
 
 class StringPiece {
@@ -891,43 +927,6 @@ std::ostream& operator<<(std::ostream& o, const StringPiece& p);
 
 #endif  // RE2_STRINGPIECE_H_
 
-#ifdef RE2_NO_THREADS
-#include <assert.h>
-#define MUTEX_IS_LOCK_COUNTER
-#else
-#ifdef _WIN32
-// Requires Windows Vista or Windows Server 2008 at minimum.
-#include <windows.h>
-#if defined(WINVER) && WINVER >= 0x0600
-#define MUTEX_IS_WIN32_SRWLOCK
-#endif
-#else
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200809L
-#endif
-#include <unistd.h>
-#if defined(_POSIX_READER_WRITER_LOCKS) && _POSIX_READER_WRITER_LOCKS > 0
-#define MUTEX_IS_PTHREAD_RWLOCK
-#endif
-#endif
-#endif
-
-#if defined(MUTEX_IS_LOCK_COUNTER)
-typedef int MutexType;
-#elif defined(MUTEX_IS_WIN32_SRWLOCK)
-typedef SRWLOCK MutexType;
-#elif defined(MUTEX_IS_PTHREAD_RWLOCK)
-#include <pthread.h>
-#include <stdlib.h>
-typedef pthread_rwlock_t MutexType;
-#else
-#include <mutex>
-typedef std::mutex MutexType;
-#endif
-
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
 
 
 
