@@ -29,10 +29,6 @@
 #include <iterator>
 #include <string>
 
-#ifdef __cpp_lib_string_view
-#include <string_view>
-#endif
-
 
 #include "util/util.h"
 #include "util/logging.h"
