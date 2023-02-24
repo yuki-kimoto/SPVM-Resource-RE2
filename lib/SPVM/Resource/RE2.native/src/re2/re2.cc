@@ -154,23 +154,39 @@ typedef std::mutex MutexType;
 
 namespace re2 {
 
+// Error status for certain operations.
+class RegexpStatus {
+ public:
+  ~RegexpStatus() { delete tmp_; }
+
+  void set_code(int code) { code_ = code; }
+  void set_error_arg(const StringPiece& error_arg) { error_arg_ = error_arg; }
+  void set_tmp(std::string* tmp) { delete tmp_; tmp_ = tmp; }
+  int code() const { return code_; }
+  const StringPiece& error_arg() const { return error_arg_; }
+
+  // Copies state from status.
+  void Copy(const RegexpStatus& status);
+
+  // Returns text equivalent of code, e.g.:
+  //   "Bad character class"
+  static std::string CodeText(int code);
+
+  // Returns text describing error, e.g.:
+  //   "Bad character class: [z-a]"
+  std::string Text() const;
+
+ private:
+  int code_;  // Kind of error
+  StringPiece error_arg_;  // Piece of regexp containing syntax error.
+  std::string* tmp_;       // Temporary storage, possibly where error_arg_ is.
+
+  RegexpStatus(const RegexpStatus&) = delete;
+  RegexpStatus& operator=(const RegexpStatus&) = delete;
+};
+
 // Compiled form; see prog.h
 class Prog;
-
-struct RuneRange {
-  RuneRange() : lo(0), hi(0) { }
-  RuneRange(int l, int h) : lo(l), hi(h) { }
-  Rune lo;
-  Rune hi;
-};
-
-// Less-than on RuneRanges treats a == b if they overlap at all.
-// This lets us look in a set to find the range covering a particular Rune.
-struct RuneRangeLess {
-  bool operator()(const RuneRange& a, const RuneRange& b) const {
-    return a.hi < b.lo;
-  }
-};
 
 class Regexp {
  public:
@@ -234,6 +250,12 @@ class Regexp {
   // Decrements reference count and deletes this object if count reaches 0.
   void Decref();
 
+  // Parses string s to produce regular expression, returned.
+  // Caller must release return value with re->Decref().
+  // On failure, sets *status (if status != NULL) and returns NULL.
+  static Regexp* Parse(const StringPiece& s, ParseFlags flags,
+                       RegexpStatus* status);
+
   // Returns a _new_ simplified version of the current regexp.
   // Does not edit the current regexp.
   // Caller must release return value with re->Decref().
@@ -273,8 +295,6 @@ class Regexp {
   static Regexp* Alternate(Regexp** subs, int nsubs, ParseFlags flags);
   static Regexp* Capture(Regexp* sub, ParseFlags flags, int cap);
   static Regexp* Repeat(Regexp* sub, ParseFlags flags, int min, int max);
-  static Regexp* NewLiteral(Rune rune, ParseFlags flags);
-  static Regexp* LiteralString(Rune* runes, int nrunes, ParseFlags flags);
   static Regexp* HaveMatch(int match_id, ParseFlags flags);
 
   // Like Alternate but does not factor out common prefixes.
@@ -356,11 +376,6 @@ class Regexp {
   static Regexp* ConcatOrAlternate(int op, Regexp** subs, int nsubs,
                                    ParseFlags flags, bool can_factor);
 
-  // Returns the leading string that re starts with.
-  // The returned Rune* points into a piece of re,
-  // so it must not be used after the caller calls re->Decref().
-  static Rune* LeadingString(Regexp* re, int* nrune, ParseFlags* flags);
-
   // Removes the first n leading runes from the beginning of re.
   // Edits re in place.
   static void RemoveLeadingString(Regexp* re, int n);
@@ -388,9 +403,6 @@ class Regexp {
       submany_ = new Regexp*[n];
     nsub_ = static_cast<uint16_t>(n);
   }
-
-  // Add Rune to LiteralString
-  void AddRuneToString(Rune r);
 
   // Swaps this with that, in place.
   void Swap(Regexp *that);
@@ -447,9 +459,7 @@ class Regexp {
     };
     struct {  // LiteralString
       int nrunes_;
-      Rune* runes_;
     };
-    Rune rune_;  // Literal
     int match_id_;  // HaveMatch
     void *the_union_[2];  // as big as any other element, for memset
   };
@@ -457,9 +467,6 @@ class Regexp {
   Regexp(const Regexp&) = delete;
   Regexp& operator=(const Regexp&) = delete;
 };
-
-// Character class set: contains non-overlapping, non-abutting RuneRanges.
-typedef std::set<RuneRange, RuneRangeLess> RuneRangeSet;
 
 }  // namespace re2
 
