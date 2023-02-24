@@ -761,69 +761,6 @@ bool RE2::Match(const StringPiece& text,
   return true;
 }
 
-// Internal matcher - like Match() but takes Args not StringPieces.
-bool RE2::DoMatch(const StringPiece& text,
-                  Anchor re_anchor,
-                  size_t* consumed,
-                  const Arg* const* args,
-                  int n) const {
-  if (!ok()) {
-    if (options_.log_errors())
-      LOG(ERROR) << "Invalid RE2: " << *error_;
-    return false;
-  }
-
-  if (NumberOfCapturingGroups() < n) {
-    // RE has fewer capturing groups than number of Arg pointers passed in.
-    return false;
-  }
-
-  // Count number of capture groups needed.
-  int nvec;
-  if (n == 0 && consumed == NULL)
-    nvec = 0;
-  else
-    nvec = n+1;
-
-  StringPiece* vec;
-  StringPiece stkvec[kVecSize];
-  StringPiece* heapvec = NULL;
-
-  if (nvec <= static_cast<int>(arraysize(stkvec))) {
-    vec = stkvec;
-  } else {
-    vec = new StringPiece[nvec];
-    heapvec = vec;
-  }
-
-  if (!Match(text, 0, text.size(), re_anchor, vec, nvec)) {
-    delete[] heapvec;
-    return false;
-  }
-
-  if (consumed != NULL)
-    *consumed = static_cast<size_t>(EndPtr(vec[0]) - BeginPtr(text));
-
-  if (n == 0 || args == NULL) {
-    // We are not interested in results
-    delete[] heapvec;
-    return true;
-  }
-
-  // If we got here, we must have matched the whole pattern.
-  for (int i = 0; i < n; i++) {
-    const StringPiece& s = vec[i+1];
-    if (!args[i]->Parse(s.data(), s.size())) {
-      // TODO: Should we indicate what the error was?
-      delete[] heapvec;
-      return false;
-    }
-  }
-
-  delete[] heapvec;
-  return true;
-}
-
 // Checks that the rewrite string is well-formed with respect to this
 // regular expression.
 bool RE2::CheckRewriteString(const StringPiece& rewrite,

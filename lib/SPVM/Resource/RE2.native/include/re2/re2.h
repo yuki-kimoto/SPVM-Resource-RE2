@@ -621,12 +621,6 @@ class RE2 {
  private:
   void Init(const StringPiece& pattern, const Options& options);
 
-  bool DoMatch(const StringPiece& text,
-               Anchor re_anchor,
-               size_t* consumed,
-               const Arg* const args[],
-               int n) const;
-
   re2::Prog* ReverseProg() const;
 
   // First cache line is relatively cold fields.
