@@ -402,44 +402,6 @@ const std::map<int, std::string>& RE2::CapturingGroupNames() const {
   return *group_names_;
 }
 
-std::string RE2::QuoteMeta(const StringPiece& unquoted) {
-  std::string result;
-  result.reserve(unquoted.size() << 1);
-
-  // Escape any ascii character not in [A-Za-z_0-9].
-  //
-  // Note that it's legal to escape a character even if it has no
-  // special meaning in a regular expression -- so this function does
-  // that.  (This also makes it identical to the perl function of the
-  // same name except for the null-character special case;
-  // see `perldoc -f quotemeta`.)
-  for (size_t ii = 0; ii < unquoted.size(); ++ii) {
-    // Note that using 'isalnum' here raises the benchmark time from
-    // 32ns to 58ns:
-    if ((unquoted[ii] < 'a' || unquoted[ii] > 'z') &&
-        (unquoted[ii] < 'A' || unquoted[ii] > 'Z') &&
-        (unquoted[ii] < '0' || unquoted[ii] > '9') &&
-        unquoted[ii] != '_' &&
-        // If this is the part of a UTF8 or Latin1 character, we need
-        // to copy this byte without escaping.  Experimentally this is
-        // what works correctly with the regexp library.
-        !(unquoted[ii] & 128)) {
-      if (unquoted[ii] == '\0') {  // Special handling for null chars.
-        // Note that this special handling is not strictly required for RE2,
-        // but this quoting is required for other regexp libraries such as
-        // PCRE.
-        // Can't use "\\0" since the next character might be a digit.
-        result += "\\x00";
-        continue;
-      }
-      result += '\\';
-    }
-    result += unquoted[ii];
-  }
-
-  return result;
-}
-
 bool RE2::PossibleMatchRange(std::string* min, std::string* max,
                              int maxlen) const {
   if (prog_ == NULL)

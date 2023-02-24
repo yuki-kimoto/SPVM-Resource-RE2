@@ -368,14 +368,6 @@ class RE2 {
                            const RE2& re,
                            const StringPiece& rewrite);
 
-  // Escapes all potentially meaningful regexp characters in
-  // 'unquoted'.  The returned string, used as a regular expression,
-  // will match exactly the original string.  For example,
-  //           1.5-2.0?
-  // may become:
-  //           1\.5\-2\.0\?
-  static std::string QuoteMeta(const StringPiece& unquoted);
-
   // Computes range for any strings matching regexp. The min and max can in
   // some cases be arbitrarily precise, so the caller gets to specify the
   // maximum desired length of string returned.
