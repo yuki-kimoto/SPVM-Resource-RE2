@@ -8,18 +8,6 @@
 // the new automata-based regular expression engines.
 
 #include <atomic>
-#include <ostream>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-#include <algorithm>
-#include <map>
-#include <mutex>
-#include <string>
-#include <vector>
-#include <stdarg.h>
-#include <stdarg.h>
-#include <stdio.h>
 
 #include "re2/re2.h"
 #include "re2/unicode_casefold.h"
