@@ -64,10 +64,6 @@ void Regexp::Destroy() {
           sub->Decref();
         else
           --sub->ref_;
-        if (sub->ref_ == 0 && !sub->QuickDestroy()) {
-          sub->down_ = stack;
-          stack = sub;
-        }
       }
       if (re->nsub_ > 1)
         delete[] subs;
