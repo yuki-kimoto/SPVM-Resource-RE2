@@ -15,11 +15,6 @@
 
 namespace re2 {
 
-// Destructor.  Assumes already cleaned up children.
-// Private: use Decref() instead of delete to destroy Regexps.
-// Can't call Decref on the sub-Regexps here because
-// that could cause arbitrarily deep recursion, so
-// required Decref() to have handled them for us.
 Regexp::~Regexp() {
 }
 
@@ -36,10 +31,6 @@ static inline Mutex* ref_mutex() {
 
 static inline std::map<Regexp*, int>* ref_map() {
   return &reinterpret_cast<RefStorage*>(ref_storage)->ref_map;
-}
-
-// Decrements reference count and deletes this object if count reaches 0.
-void Regexp::Decref() {
 }
 
 // Deletes this object; ref count has count reached 0.
@@ -60,8 +51,6 @@ void Regexp::Destroy() {
         Regexp* sub = subs[i];
         if (sub == NULL)
           continue;
-        if (sub->ref_ == kMaxRef)
-          sub->Decref();
         else
           --sub->ref_;
       }
