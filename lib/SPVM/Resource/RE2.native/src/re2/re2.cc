@@ -15,47 +15,6 @@
 
 namespace re2 {
 
-namespace hooks {
-
-#ifdef RE2_HAVE_THREAD_LOCAL
-thread_local const RE2* context = NULL;
-#endif
-
-template <typename T>
-union Hook {
-  void Store(T* cb) { cb_.store(cb, std::memory_order_release); }
-  T* Load() const { return cb_.load(std::memory_order_acquire); }
-
-#if !defined(__clang__) && defined(_MSC_VER)
-  // Citing https://github.com/protocolbuffers/protobuf/pull/4777 as precedent,
-  // this is a gross hack to make std::atomic<T*> constant-initialized on MSVC.
-  static_assert(ATOMIC_POINTER_LOCK_FREE == 2,
-                "std::atomic<T*> must be always lock-free");
-  T* cb_for_constinit_;
-#endif
-
-  std::atomic<T*> cb_;
-};
-
-template <typename T>
-static void DoNothing(const T&) {}
-
-#define DEFINE_HOOK(type, name)                                       \
-  static Hook<type##Callback> name##_hook = {{&DoNothing<type>}};     \
-  void Set##type##Hook(type##Callback* cb) { name##_hook.Store(cb); } \
-  type##Callback* Get##type##Hook() { return name##_hook.Load(); }
-
-DEFINE_HOOK(DFAStateCacheReset, dfa_state_cache_reset)
-DEFINE_HOOK(DFASearchFailure, dfa_search_failure)
-
-#undef DEFINE_HOOK
-
-}  // namespace hooks
-
-}  // namespace re2
-
-namespace re2 {
-
 // Constructor.  Allocates vectors as appropriate for operator.
 Regexp::Regexp(RegexpOp op, ParseFlags parse_flags)
   : op_(static_cast<uint8_t>(op)),
