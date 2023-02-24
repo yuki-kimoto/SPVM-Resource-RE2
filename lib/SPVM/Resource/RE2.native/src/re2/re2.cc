@@ -11,7 +11,6 @@
 
 #include "re2/re2.h"
 #include "util/mutex.h"
-#include "re2/walker-inl.h"
 
 namespace re2 {
 
