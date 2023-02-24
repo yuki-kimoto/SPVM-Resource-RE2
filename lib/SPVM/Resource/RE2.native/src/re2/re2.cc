@@ -9,22 +9,7 @@
 
 #include "re2/re2.h"
 
-#include <assert.h>
-#include <ctype.h>
-#include <errno.h>
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <algorithm>
 #include <atomic>
-#include <iterator>
-#include <mutex>
-#include <string>
-#include <utility>
-#include <vector>
 
 #include "re2/regexp.h"
 
