@@ -415,60 +415,6 @@ Rune CycleFoldRune(Rune r) {
   return ApplyFold(f, r);
 }
 
-// Add lo-hi to the class, along with their fold-equivalent characters.
-// If lo-hi is already in the class, assume that the fold-equivalent
-// chars are there too, so there's no work to do.
-static void AddFoldedRange(CharClassBuilder* cc, Rune lo, Rune hi, int depth) {
-  // AddFoldedRange calls itself recursively for each rune in the fold cycle.
-  // Most folding cycles are small: there aren't any bigger than four in the
-  // current Unicode tables.  make_unicode_casefold.py checks that
-  // the cycles are not too long, and we double-check here using depth.
-  if (depth > 10) {
-    LOG(DFATAL) << "AddFoldedRange recurses too much.";
-    return;
-  }
-
-  if (!cc->AddRange(lo, hi))  // lo-hi was already there? we're done
-    return;
-
-  while (lo <= hi) {
-    const CaseFold* f = LookupCaseFold(unicode_casefold, num_unicode_casefold, lo);
-    if (f == NULL)  // lo has no fold, nor does anything above lo
-      break;
-    if (lo < f->lo) {  // lo has no fold; next rune with a fold is f->lo
-      lo = f->lo;
-      continue;
-    }
-
-    // Add in the result of folding the range lo - f->hi
-    // and that range's fold, recursively.
-    Rune lo1 = lo;
-    Rune hi1 = std::min<Rune>(hi, f->hi);
-    switch (f->delta) {
-      default:
-        lo1 += f->delta;
-        hi1 += f->delta;
-        break;
-      case EvenOdd:
-        if (lo1%2 == 1)
-          lo1--;
-        if (hi1%2 == 0)
-          hi1++;
-        break;
-      case OddEven:
-        if (lo1%2 == 0)
-          lo1--;
-        if (hi1%2 == 1)
-          hi1++;
-        break;
-    }
-    AddFoldedRange(cc, lo1, hi1, depth+1);
-
-    // Pick up where this fold left off.
-    lo = f->hi + 1;
-  }
-}
-
 // Pushes the literal rune r onto the stack.
 bool Regexp::ParseState::PushLiteral(Rune r) {
   // Do case folding if needed.
@@ -1393,282 +1339,6 @@ bool Regexp::ParseState::MaybeConcatString(int r, ParseFlags flags) {
   return false;
 }
 
-// Lexing routines.
-
-// Parses a decimal integer, storing it in *np.
-// Sets *s to span the remainder of the string.
-static bool ParseInteger(StringPiece* s, int* np) {
-  if (s->empty() || !isdigit((*s)[0] & 0xFF))
-    return false;
-  // Disallow leading zeros.
-  if (s->size() >= 2 && (*s)[0] == '0' && isdigit((*s)[1] & 0xFF))
-    return false;
-  int n = 0;
-  int c;
-  while (!s->empty() && isdigit(c = (*s)[0] & 0xFF)) {
-    // Avoid overflow.
-    if (n >= 100000000)
-      return false;
-    n = n*10 + c - '0';
-    s->remove_prefix(1);  // digit
-  }
-  *np = n;
-  return true;
-}
-
-// Parses a repetition suffix like {1,2} or {2} or {2,}.
-// Sets *s to span the remainder of the string on success.
-// Sets *lo and *hi to the given range.
-// In the case of {2,}, the high number is unbounded;
-// sets *hi to -1 to signify this.
-// {,2} is NOT a valid suffix.
-// The Maybe in the name signifies that the regexp parse
-// doesn't fail even if ParseRepetition does, so the StringPiece
-// s must NOT be edited unless MaybeParseRepetition returns true.
-static bool MaybeParseRepetition(StringPiece* sp, int* lo, int* hi) {
-  StringPiece s = *sp;
-  if (s.empty() || s[0] != '{')
-    return false;
-  s.remove_prefix(1);  // '{'
-  if (!ParseInteger(&s, lo))
-    return false;
-  if (s.empty())
-    return false;
-  if (s[0] == ',') {
-    s.remove_prefix(1);  // ','
-    if (s.empty())
-      return false;
-    if (s[0] == '}') {
-      // {2,} means at least 2
-      *hi = -1;
-    } else {
-      // {2,4} means 2, 3, or 4.
-      if (!ParseInteger(&s, hi))
-        return false;
-    }
-  } else {
-    // {2} means exactly two
-    *hi = *lo;
-  }
-  if (s.empty() || s[0] != '}')
-    return false;
-  s.remove_prefix(1);  // '}'
-  *sp = s;
-  return true;
-}
-
-// Removes the next Rune from the StringPiece and stores it in *r.
-// Returns number of bytes removed from sp.
-// Behaves as though there is a terminating NUL at the end of sp.
-// Argument order is backwards from usual Google style
-// but consistent with chartorune.
-static int StringPieceToRune(Rune *r, StringPiece *sp, RegexpStatus* status) {
-  // fullrune() takes int, not size_t. However, it just looks
-  // at the leading byte and treats any length >= 4 the same.
-  if (fullrune(sp->data(), static_cast<int>(std::min(size_t{4}, sp->size())))) {
-    int n = chartorune(r, sp->data());
-    // Some copies of chartorune have a bug that accepts
-    // encodings of values in (10FFFF, 1FFFFF] as valid.
-    // Those values break the character class algorithm,
-    // which assumes Runemax is the largest rune.
-    if (*r > Runemax) {
-      n = 1;
-      *r = Runeerror;
-    }
-    if (!(n == 1 && *r == Runeerror)) {  // no decoding error
-      sp->remove_prefix(n);
-      return n;
-    }
-  }
-
-  if (status != NULL) {
-    status->set_code(kRegexpBadUTF8);
-    status->set_error_arg(StringPiece());
-  }
-  return -1;
-}
-
-// Returns whether name is valid UTF-8.
-// If not, sets status to kRegexpBadUTF8.
-static bool IsValidUTF8(const StringPiece& s, RegexpStatus* status) {
-  StringPiece t = s;
-  Rune r;
-  while (!t.empty()) {
-    if (StringPieceToRune(&r, &t, status) < 0)
-      return false;
-  }
-  return true;
-}
-
-// Is c a hex digit?
-static int IsHex(int c) {
-  return ('0' <= c && c <= '9') ||
-         ('A' <= c && c <= 'F') ||
-         ('a' <= c && c <= 'f');
-}
-
-// Convert hex digit to value.
-static int UnHex(int c) {
-  if ('0' <= c && c <= '9')
-    return c - '0';
-  if ('A' <= c && c <= 'F')
-    return c - 'A' + 10;
-  if ('a' <= c && c <= 'f')
-    return c - 'a' + 10;
-  LOG(DFATAL) << "Bad hex digit " << c;
-  return 0;
-}
-
-// Parse an escape sequence (e.g., \n, \{).
-// Sets *s to span the remainder of the string.
-// Sets *rp to the named character.
-static bool ParseEscape(StringPiece* s, Rune* rp,
-                        RegexpStatus* status, int rune_max) {
-  const char* begin = s->data();
-  if (s->empty() || (*s)[0] != '\\') {
-    // Should not happen - caller always checks.
-    status->set_code(kRegexpInternalError);
-    status->set_error_arg(StringPiece());
-    return false;
-  }
-  if (s->size() == 1) {
-    status->set_code(kRegexpTrailingBackslash);
-    status->set_error_arg(StringPiece());
-    return false;
-  }
-  Rune c, c1;
-  s->remove_prefix(1);  // backslash
-  if (StringPieceToRune(&c, s, status) < 0)
-    return false;
-  int code;
-  switch (c) {
-    default:
-      if (c < Runeself && !isalpha(c) && !isdigit(c)) {
-        // Escaped non-word characters are always themselves.
-        // PCRE is not quite so rigorous: it accepts things like
-        // \q, but we don't.  We once rejected \_, but too many
-        // programs and people insist on using it, so allow \_.
-        *rp = c;
-        return true;
-      }
-      goto BadEscape;
-
-    // Octal escapes.
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-      // Single non-zero octal digit is a backreference; not supported.
-      if (s->empty() || (*s)[0] < '0' || (*s)[0] > '7')
-        goto BadEscape;
-      FALLTHROUGH_INTENDED;
-    case '0':
-      // consume up to three octal digits; already have one.
-      code = c - '0';
-      if (!s->empty() && '0' <= (c = (*s)[0]) && c <= '7') {
-        code = code * 8 + c - '0';
-        s->remove_prefix(1);  // digit
-        if (!s->empty()) {
-          c = (*s)[0];
-          if ('0' <= c && c <= '7') {
-            code = code * 8 + c - '0';
-            s->remove_prefix(1);  // digit
-          }
-        }
-      }
-      if (code > rune_max)
-        goto BadEscape;
-      *rp = code;
-      return true;
-
-    // Hexadecimal escapes
-    case 'x':
-      if (s->empty())
-        goto BadEscape;
-      if (StringPieceToRune(&c, s, status) < 0)
-        return false;
-      if (c == '{') {
-        // Any number of digits in braces.
-        // Update n as we consume the string, so that
-        // the whole thing gets shown in the error message.
-        // Perl accepts any text at all; it ignores all text
-        // after the first non-hex digit.  We require only hex digits,
-        // and at least one.
-        if (StringPieceToRune(&c, s, status) < 0)
-          return false;
-        int nhex = 0;
-        code = 0;
-        while (IsHex(c)) {
-          nhex++;
-          code = code * 16 + UnHex(c);
-          if (code > rune_max)
-            goto BadEscape;
-          if (s->empty())
-            goto BadEscape;
-          if (StringPieceToRune(&c, s, status) < 0)
-            return false;
-        }
-        if (c != '}' || nhex == 0)
-          goto BadEscape;
-        *rp = code;
-        return true;
-      }
-      // Easy case: two hex digits.
-      if (s->empty())
-        goto BadEscape;
-      if (StringPieceToRune(&c1, s, status) < 0)
-        return false;
-      if (!IsHex(c) || !IsHex(c1))
-        goto BadEscape;
-      *rp = UnHex(c) * 16 + UnHex(c1);
-      return true;
-
-    // C escapes.
-    case 'n':
-      *rp = '\n';
-      return true;
-    case 'r':
-      *rp = '\r';
-      return true;
-    case 't':
-      *rp = '\t';
-      return true;
-
-    // Less common C escapes.
-    case 'a':
-      *rp = '\a';
-      return true;
-    case 'f':
-      *rp = '\f';
-      return true;
-    case 'v':
-      *rp = '\v';
-      return true;
-
-    // This code is disabled to avoid misparsing
-    // the Perl word-boundary \b as a backspace
-    // when in POSIX regexp mode.  Surprisingly,
-    // in Perl, \b means word-boundary but [\b]
-    // means backspace.  We don't support that:
-    // if you want a backspace embed a literal
-    // backspace character or use \x08.
-    //
-    // case 'b':
-    //   *rp = '\b';
-    //   return true;
-  }
-
-BadEscape:
-  // Unrecognized escape sequence.
-  status->set_code(kRegexpBadEscape);
-  status->set_error_arg(
-      StringPiece(begin, static_cast<size_t>(s->data() - begin)));
-  return false;
-}
-
 // Add a range to the character class, but exclude newline if asked.
 // Also handle case folding.
 void CharClassBuilder::AddRangeFlags(
@@ -1685,91 +1355,6 @@ void CharClassBuilder::AddRangeFlags(
     return;
   }
 
-  // If folding case, add fold-equivalent characters too.
-  if (parse_flags & Regexp::FoldCase)
-    AddFoldedRange(this, lo, hi, 0);
-  else
-    AddRange(lo, hi);
-}
-
-// Look for a group with the given name.
-static const UGroup* LookupGroup(const StringPiece& name,
-                                 const UGroup *groups, int ngroups) {
-  // Simple name lookup.
-  for (int i = 0; i < ngroups; i++)
-    if (StringPiece(groups[i].name) == name)
-      return &groups[i];
-  return NULL;
-}
-
-// Look for a POSIX group with the given name (e.g., "[:^alpha:]")
-static const UGroup* LookupPosixGroup(const StringPiece& name) {
-  return LookupGroup(name, NULL, 0);
-}
-
-static const UGroup* LookupPerlGroup(const StringPiece& name) {
-  return LookupGroup(name, NULL, 0);
-}
-
-#if !defined(RE2_USE_ICU)
-// Fake UGroup containing all Runes
-static URange16 any16[] = { { 0, 65535 } };
-static URange32 any32[] = { { 65536, Runemax } };
-static UGroup anygroup = { "Any", +1, any16, 1, any32, 1 };
-
-// Look for a Unicode group with the given name (e.g., "Han")
-static const UGroup* LookupUnicodeGroup(const StringPiece& name) {
-  // Special case: "Any" means any.
-  if (name == StringPiece("Any"))
-    return &anygroup;
-  return LookupGroup(name, NULL, 0);
-}
-#endif
-
-// Add a UGroup or its negation to the character class.
-static void AddUGroup(CharClassBuilder *cc, const UGroup *g, int sign,
-                      Regexp::ParseFlags parse_flags) {
-  if (sign == +1) {
-    for (int i = 0; i < g->nr16; i++) {
-      cc->AddRangeFlags(g->r16[i].lo, g->r16[i].hi, parse_flags);
-    }
-    for (int i = 0; i < g->nr32; i++) {
-      cc->AddRangeFlags(g->r32[i].lo, g->r32[i].hi, parse_flags);
-    }
-  } else {
-    if (parse_flags & Regexp::FoldCase) {
-      // Normally adding a case-folded group means
-      // adding all the extra fold-equivalent runes too.
-      // But if we're adding the negation of the group,
-      // we have to exclude all the runes that are fold-equivalent
-      // to what's already missing.  Too hard, so do in two steps.
-      CharClassBuilder ccb1;
-      AddUGroup(&ccb1, g, +1, parse_flags);
-      // If the flags say to take out \n, put it in, so that negating will take it out.
-      // Normally AddRangeFlags does this, but we're bypassing AddRangeFlags.
-      bool cutnl = !(parse_flags & Regexp::ClassNL) ||
-                   (parse_flags & Regexp::NeverNL);
-      if (cutnl) {
-        ccb1.AddRange('\n', '\n');
-      }
-      ccb1.Negate();
-      cc->AddCharClass(&ccb1);
-      return;
-    }
-    int next = 0;
-    for (int i = 0; i < g->nr16; i++) {
-      if (next < g->r16[i].lo)
-        cc->AddRangeFlags(next, g->r16[i].lo - 1, parse_flags);
-      next = g->r16[i].hi + 1;
-    }
-    for (int i = 0; i < g->nr32; i++) {
-      if (next < g->r32[i].lo)
-        cc->AddRangeFlags(next, g->r32[i].lo - 1, parse_flags);
-      next = g->r32[i].hi + 1;
-    }
-    if (next <= Runemax)
-      cc->AddRangeFlags(next, Runemax, parse_flags);
-  }
 }
 
 // Maybe parse a Perl character class escape sequence.
@@ -1786,7 +1371,7 @@ const UGroup* MaybeParsePerlCCEscape(StringPiece* s, Regexp::ParseFlags parse_fl
   // Could use StringPieceToRune, but there aren't
   // any non-ASCII Perl group names.
   StringPiece name(s->data(), 2);
-  const UGroup *g = LookupPerlGroup(name);
+  const UGroup *g = NULL;
   if (g == NULL)
     return NULL;
   s->remove_prefix(name.size());
@@ -1821,8 +1406,6 @@ ParseStatus ParseUnicodeGroup(StringPiece* s, Regexp::ParseFlags parse_flags,
   StringPiece name;  // Han or L
   s->remove_prefix(2);  // '\\', 'p'
 
-  if (!StringPieceToRune(&c, s, status))
-    return kParseError;
   if (c != '{') {
     // Name is the bit of string we just skipped over for c.
     const char* p = seq.data() + 2;
@@ -1831,16 +1414,12 @@ ParseStatus ParseUnicodeGroup(StringPiece* s, Regexp::ParseFlags parse_flags,
     // Name is in braces. Look for closing }
     size_t end = s->find('}', 0);
     if (end == StringPiece::npos) {
-      if (!IsValidUTF8(seq, status))
-        return kParseError;
       status->set_code(kRegexpBadCharRange);
       status->set_error_arg(seq);
       return kParseError;
     }
     name = StringPiece(s->data(), end);  // without '}'
     s->remove_prefix(end + 1);  // with '}'
-    if (!IsValidUTF8(name, status))
-      return kParseError;
   }
 
   // Chop seq where s now begins.
@@ -1853,14 +1432,13 @@ ParseStatus ParseUnicodeGroup(StringPiece* s, Regexp::ParseFlags parse_flags,
 
 #if !defined(RE2_USE_ICU)
   // Look up the group in the RE2 Unicode data.
-  const UGroup *g = LookupUnicodeGroup(name);
+  const UGroup *g = NULL;
   if (g == NULL) {
     status->set_code(kRegexpBadCharRange);
     status->set_error_arg(seq);
     return kParseError;
   }
 
-  AddUGroup(cc, g, sign, parse_flags);
 #else
   // Look up the group in the ICU Unicode data. Because ICU provides full
   // Unicode properties support, this could be more than a lookup by name.
@@ -1882,46 +1460,8 @@ ParseStatus ParseUnicodeGroup(StringPiece* s, Regexp::ParseFlags parse_flags,
     r[i].hi = uset.getRangeEnd(i);
   }
   UGroup g = {"", +1, 0, 0, r.data(), nr};
-  AddUGroup(cc, &g, sign, parse_flags);
 #endif
 
-  return kParseOk;
-}
-
-// Parses a character class name like [:alnum:].
-// Sets *s to span the remainder of the string.
-// Adds the ranges corresponding to the class to ranges.
-static ParseStatus ParseCCName(StringPiece* s, Regexp::ParseFlags parse_flags,
-                               CharClassBuilder *cc,
-                               RegexpStatus* status) {
-  // Check begins with [:
-  const char* p = s->data();
-  const char* ep = s->data() + s->size();
-  if (ep - p < 2 || p[0] != '[' || p[1] != ':')
-    return kParseNothing;
-
-  // Look for closing :].
-  const char* q;
-  for (q = p+2; q <= ep-2 && (*q != ':' || *(q+1) != ']'); q++)
-    ;
-
-  // If no closing :], then ignore.
-  if (q > ep-2)
-    return kParseNothing;
-
-  // Got it.  Check that it's valid.
-  q += 2;
-  StringPiece name(p, static_cast<size_t>(q - p));
-
-  const UGroup *g = LookupPosixGroup(name);
-  if (g == NULL) {
-    status->set_code(kRegexpBadCharRange);
-    status->set_error_arg(name);
-    return kParseError;
-  }
-
-  s->remove_prefix(name.size());
-  AddUGroup(cc, g, g->sign, parse_flags);
   return kParseOk;
 }
 
@@ -1938,13 +1478,8 @@ bool Regexp::ParseState::ParseCCCharacter(StringPiece* s, Rune *rp,
     return false;
   }
 
-  // Allow regular escape sequences even though
-  // many need not be escaped in this context.
-  if ((*s)[0] == '\\')
-    return ParseEscape(s, rp, status, rune_max_);
-
   // Otherwise take the next rune.
-  return StringPieceToRune(rp, s, status) >= 0;
+  return 1;
 }
 
 // Parses a character class character, or, if the character
@@ -2010,7 +1545,7 @@ bool Regexp::ParseState::ParseCharClass(StringPiece* s,
       StringPiece t = *s;
       t.remove_prefix(1);  // '-'
       Rune r;
-      int n = StringPieceToRune(&r, &t, status);
+      int n = 1;
       if (n < 0) {
         re->Decref();
         return false;
@@ -2021,19 +1556,6 @@ bool Regexp::ParseState::ParseCharClass(StringPiece* s,
       return false;
     }
     first = false;
-
-    // Look for [:alnum:] etc.
-    if (s->size() > 2 && (*s)[0] == '[' && (*s)[1] == ':') {
-      switch (ParseCCName(s, flags_, re->ccb_, status)) {
-        case kParseOk:
-          continue;
-        case kParseError:
-          re->Decref();
-          return false;
-        case kParseNothing:
-          break;
-      }
-    }
 
     // Look for Unicode character group like \p{Han}
     if (s->size() > 2 &&
@@ -2052,10 +1574,6 @@ bool Regexp::ParseState::ParseCharClass(StringPiece* s,
 
     // Look for Perl character class symbols (extension).
     const UGroup *g = MaybeParsePerlCCEscape(s, flags_);
-    if (g != NULL) {
-      AddUGroup(re->ccb_, g, g->sign, flags_);
-      continue;
-    }
 
     // Otherwise assume single character or simple range.
     RuneRange rr;
@@ -2082,40 +1600,6 @@ bool Regexp::ParseState::ParseCharClass(StringPiece* s,
     re->ccb_->Negate();
 
   *out_re = re;
-  return true;
-}
-
-// Returns whether name is a valid capture name.
-static bool IsValidCaptureName(const StringPiece& name) {
-  if (name.empty())
-    return false;
-
-  // Historically, we effectively used [0-9A-Za-z_]+ to validate; that
-  // followed Python 2 except for not restricting the first character.
-  // As of Python 3, Unicode characters beyond ASCII are also allowed;
-  // accordingly, we permit the Lu, Ll, Lt, Lm, Lo, Nl, Mn, Mc, Nd and
-  // Pc categories, but again without restricting the first character.
-  // Also, Unicode normalization (e.g. NFKC) isn't performed: Python 3
-  // performs it for identifiers, but seemingly not for capture names;
-  // if they start doing that for capture names, we won't follow suit.
-  static const CharClass* const cc = []() {
-    CharClassBuilder ccb;
-    for (StringPiece group :
-         {"Lu", "Ll", "Lt", "Lm", "Lo", "Nl", "Mn", "Mc", "Nd", "Pc"})
-      AddUGroup(&ccb, LookupGroup(group, NULL, 0),
-                +1, Regexp::NoParseFlags);
-    return ccb.GetCharClass();
-  }();
-
-  StringPiece t = name;
-  Rune r;
-  while (!t.empty()) {
-    if (StringPieceToRune(&r, &t, NULL) < 0)
-      return false;
-    if (cc->Contains(r))
-      continue;
-    return false;
-  }
   return true;
 }
 
@@ -2155,8 +1639,6 @@ bool Regexp::ParseState::ParsePerlFlags(StringPiece* s) {
     // Pull out name.
     size_t end = t.find('>', 2);
     if (end == StringPiece::npos) {
-      if (!IsValidUTF8(*s, status_))
-        return false;
       status_->set_code(kRegexpBadNamedCapture);
       status_->set_error_arg(*s);
       return false;
@@ -2165,13 +1647,6 @@ bool Regexp::ParseState::ParsePerlFlags(StringPiece* s) {
     // t is "P<name>...", t[end] == '>'
     StringPiece capture(t.data()-2, end+3);  // "(?P<name>"
     StringPiece name(t.data()+2, end-2);     // "name"
-    if (!IsValidUTF8(name, status_))
-      return false;
-    if (!IsValidCaptureName(name)) {
-      status_->set_code(kRegexpBadNamedCapture);
-      status_->set_error_arg(capture);
-      return false;
-    }
 
     if (!DoLeftParen(name)) {
       // DoLeftParen's failure set status_.
@@ -2190,8 +1665,6 @@ bool Regexp::ParseState::ParsePerlFlags(StringPiece* s) {
   for (bool done = false; !done; ) {
     if (t.empty())
       goto BadPerlOp;
-    if (StringPieceToRune(&c, &t, status_) < 0)
-      return false;
     switch (c) {
       default:
         goto BadPerlOp;
@@ -2308,8 +1781,6 @@ Regexp* Regexp::Parse(const StringPiece& s, ParseFlags global_flags,
     // Special parse loop for literal string.
     while (!t.empty()) {
       Rune r;
-      if (StringPieceToRune(&r, &t, status) < 0)
-        return NULL;
       if (!ps.PushLiteral(r))
         return NULL;
     }
@@ -2322,8 +1793,6 @@ Regexp* Regexp::Parse(const StringPiece& s, ParseFlags global_flags,
     switch (t[0]) {
       default: {
         Rune r;
-        if (StringPieceToRune(&r, &t, status) < 0)
-          return NULL;
         if (!ps.PushLiteral(r))
           return NULL;
         break;
@@ -2427,13 +1896,6 @@ Regexp* Regexp::Parse(const StringPiece& s, ParseFlags global_flags,
       case '{': {  // Counted repetition.
         int lo, hi;
         StringPiece opstr = t;
-        if (!MaybeParseRepetition(&t, &lo, &hi)) {
-          // Treat like a literal.
-          if (!ps.PushLiteral('{'))
-            return NULL;
-          t.remove_prefix(1);  // '{'
-          break;
-        }
         bool nongreedy = false;
         if (ps.flags() & PerlX) {
           if (!t.empty() && t[0] == '?') {
@@ -2500,8 +1962,6 @@ Regexp* Regexp::Parse(const StringPiece& s, ParseFlags global_flags,
                 break;
               }
               Rune r;
-              if (StringPieceToRune(&r, &t, status) < 0)
-                return NULL;
               if (!ps.PushLiteral(r))
                 return NULL;
             }
@@ -2530,15 +1990,12 @@ Regexp* Regexp::Parse(const StringPiece& s, ParseFlags global_flags,
         if (g != NULL) {
           Regexp* re = new Regexp(kRegexpCharClass, ps.flags() & ~FoldCase);
           re->ccb_ = new CharClassBuilder;
-          AddUGroup(re->ccb_, g, g->sign, ps.flags());
           if (!ps.PushRegexp(re))
             return NULL;
           break;
         }
 
         Rune r;
-        if (!ParseEscape(&t, &r, status, ps.rune_max()))
-          return NULL;
         if (!ps.PushLiteral(r))
           return NULL;
         break;
