@@ -15,68 +15,6 @@
 
 namespace re2 {
 
-const int RE2::Options::kDefaultMaxMem;  // initialized in re2.h
-
-RE2::Options::Options(RE2::CannedOptions opt)
-  : max_mem_(kDefaultMaxMem),
-    encoding_(opt == RE2::Latin1 ? EncodingLatin1 : EncodingUTF8),
-    posix_syntax_(opt == RE2::POSIX),
-    longest_match_(opt == RE2::POSIX),
-    log_errors_(opt != RE2::Quiet),
-    literal_(false),
-    never_nl_(false),
-    dot_nl_(false),
-    never_capture_(false),
-    case_sensitive_(true),
-    perl_classes_(false),
-    word_boundary_(false),
-    one_line_(false) {
-}
-
-int RE2::Options::ParseFlags() const {
-  int flags = Regexp::ClassNL;
-  switch (encoding()) {
-    default:
-      if (log_errors())
-        LOG(ERROR) << "Unknown encoding " << encoding();
-      break;
-    case RE2::Options::EncodingUTF8:
-      break;
-    case RE2::Options::EncodingLatin1:
-      flags |= Regexp::Latin1;
-      break;
-  }
-
-  if (!posix_syntax())
-    flags |= Regexp::LikePerl;
-
-  if (literal())
-    flags |= Regexp::Literal;
-
-  if (never_nl())
-    flags |= Regexp::NeverNL;
-
-  if (dot_nl())
-    flags |= Regexp::DotNL;
-
-  if (never_capture())
-    flags |= Regexp::NeverCapture;
-
-  if (!case_sensitive())
-    flags |= Regexp::FoldCase;
-
-  if (perl_classes())
-    flags |= Regexp::PerlClasses;
-
-  if (word_boundary())
-    flags |= Regexp::PerlB;
-
-  if (one_line())
-    flags |= Regexp::OneLine;
-
-  return flags;
-}
-
 namespace hooks {
 
 #ifdef RE2_HAVE_THREAD_LOCAL
