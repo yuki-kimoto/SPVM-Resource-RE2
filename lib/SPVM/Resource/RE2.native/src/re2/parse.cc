@@ -32,7 +32,6 @@
 #include "re2/pod_array.h"
 #include "re2/regexp.h"
 #include "re2/stringpiece.h"
-#include "re2/unicode_casefold.h"
 #include "re2/unicode_groups.h"
 #include "re2/walker-inl.h"
 
@@ -41,6 +40,85 @@
 #include "unicode/unistr.h"
 #include "unicode/utypes.h"
 #endif
+
+// Copyright 2008 The RE2 Authors.  All Rights Reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+#ifndef RE2_UNICODE_CASEFOLD_H_
+#define RE2_UNICODE_CASEFOLD_H_
+
+// Unicode case folding tables.
+
+// The Unicode case folding tables encode the mapping from one Unicode point
+// to the next largest Unicode point with equivalent folding.  The largest
+// point wraps back to the first.  For example, the tables map:
+//
+//     'A' -> 'a'
+//     'a' -> 'A'
+//
+//     'K' -> 'k'
+//     'k' -> 'K'  (Kelvin symbol)
+//     'K' -> 'K'
+//
+// Like everything Unicode, these tables are big.  If we represent the table
+// as a sorted list of uint32_t pairs, it has 2049 entries and is 16 kB.
+// Most table entries look like the ones around them:
+// 'A' maps to 'A'+32, 'B' maps to 'B'+32, etc.
+// Instead of listing all the pairs explicitly, we make a list of ranges
+// and deltas, so that the table entries for 'A' through 'Z' can be represented
+// as a single entry { 'A', 'Z', +32 }.
+//
+// In addition to blocks that map to each other (A-Z mapping to a-z)
+// there are blocks of pairs that individually map to each other
+// (for example, 0100<->0101, 0102<->0103, 0104<->0105, ...).
+// For those, the special delta value EvenOdd marks even/odd pairs
+// (if even, add 1; if odd, subtract 1), and OddEven marks odd/even pairs.
+//
+// In this form, the table has 274 entries, about 3kB.  If we were to split
+// the table into one for 16-bit codes and an overflow table for larger ones,
+// we could get it down to about 1.5kB, but that's not worth the complexity.
+//
+// The grouped form also allows for efficient fold range calculations
+// rather than looping one character at a time.
+
+#include <stdint.h>
+
+#include "util/util.h"
+#include "util/utf.h"
+
+namespace re2 {
+
+enum {
+  EvenOdd = 1,
+  OddEven = -1,
+  EvenOddSkip = 1<<30,
+  OddEvenSkip,
+};
+
+struct CaseFold {
+  Rune lo;
+  Rune hi;
+  int32_t delta;
+};
+
+extern const CaseFold unicode_casefold[];
+extern const int num_unicode_casefold;
+
+extern const CaseFold unicode_tolower[];
+extern const int num_unicode_tolower;
+
+// Returns the CaseFold* in the tables that contains rune.
+// If rune is not in the tables, returns the first CaseFold* after rune.
+// If rune is larger than any value in the tables, returns NULL.
+extern const CaseFold* LookupCaseFold(const CaseFold*, int, Rune rune);
+
+// Returns the result of applying the fold f to the rune r.
+extern Rune ApplyFold(const CaseFold *f, Rune r);
+
+}  // namespace re2
+
+#endif  // RE2_UNICODE_CASEFOLD_H_
 
 namespace re2 {
 
@@ -1626,11 +1704,11 @@ static const UGroup* LookupGroup(const StringPiece& name,
 
 // Look for a POSIX group with the given name (e.g., "[:^alpha:]")
 static const UGroup* LookupPosixGroup(const StringPiece& name) {
-  return LookupGroup(name, posix_groups, num_posix_groups);
+  return LookupGroup(name, NULL, 0);
 }
 
 static const UGroup* LookupPerlGroup(const StringPiece& name) {
-  return LookupGroup(name, perl_groups, num_perl_groups);
+  return LookupGroup(name, NULL, 0);
 }
 
 #if !defined(RE2_USE_ICU)
@@ -1644,7 +1722,7 @@ static const UGroup* LookupUnicodeGroup(const StringPiece& name) {
   // Special case: "Any" means any.
   if (name == StringPiece("Any"))
     return &anygroup;
-  return LookupGroup(name, unicode_groups, num_unicode_groups);
+  return LookupGroup(name, NULL, 0);
 }
 #endif
 
@@ -2024,7 +2102,7 @@ static bool IsValidCaptureName(const StringPiece& name) {
     CharClassBuilder ccb;
     for (StringPiece group :
          {"Lu", "Ll", "Lt", "Lm", "Lo", "Nl", "Mn", "Mc", "Nd", "Pc"})
-      AddUGroup(&ccb, LookupGroup(group, unicode_groups, num_unicode_groups),
+      AddUGroup(&ccb, LookupGroup(group, NULL, 0),
                 +1, Regexp::NoParseFlags);
     return ccb.GetCharClass();
   }();
