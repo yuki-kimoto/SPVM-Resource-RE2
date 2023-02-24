@@ -8,6 +8,59 @@
 // the new automata-based regular expression engines.
 
 #include <atomic>
+#include <stack>
+#include <stddef.h>
+#include <stdint.h>
+#include <algorithm>
+#include <map>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include "util/logging.h"
+#include "re2/regexp.h"
+#include "re2/stringpiece.h"
+
+#ifdef RE2_NO_THREADS
+#include <assert.h>
+#define MUTEX_IS_LOCK_COUNTER
+#else
+#ifdef _WIN32
+// Requires Windows Vista or Windows Server 2008 at minimum.
+#include <windows.h>
+#if defined(WINVER) && WINVER >= 0x0600
+#define MUTEX_IS_WIN32_SRWLOCK
+#endif
+#else
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <unistd.h>
+#if defined(_POSIX_READER_WRITER_LOCKS) && _POSIX_READER_WRITER_LOCKS > 0
+#define MUTEX_IS_PTHREAD_RWLOCK
+#endif
+#endif
+#endif
+
+#if defined(MUTEX_IS_LOCK_COUNTER)
+typedef int MutexType;
+#elif defined(MUTEX_IS_WIN32_SRWLOCK)
+typedef SRWLOCK MutexType;
+#elif defined(MUTEX_IS_PTHREAD_RWLOCK)
+#include <pthread.h>
+#include <stdlib.h>
+typedef pthread_rwlock_t MutexType;
+#else
+#include <mutex>
+typedef std::mutex MutexType;
+#endif
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+
 
 // Copyright 2003-2009 The RE2 Authors.  All Rights Reserved.
 // Use of this source code is governed by a BSD-style
@@ -200,21 +253,6 @@
 //   CHECK(RE2::FullMatch("100 40 0100 0x40", "(.*) (.*) (.*) (.*)",
 //         RE2::Octal(&a), RE2::Hex(&b), RE2::CRadix(&c), RE2::CRadix(&d));
 // will leave 64 in a, b, c, and d.
-
-#include <stddef.h>
-#include <stdint.h>
-#include <algorithm>
-#include <map>
-#include <mutex>
-#include <string>
-#include <type_traits>
-#include <vector>
-
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
-
-#include "re2/stringpiece.h"
 
 namespace re2 {
 class Prog;
@@ -868,40 +906,6 @@ using re2::LazyRE2;
  * You should assume the locks are *not* re-entrant.
  */
 
-#ifdef RE2_NO_THREADS
-#include <assert.h>
-#define MUTEX_IS_LOCK_COUNTER
-#else
-#ifdef _WIN32
-// Requires Windows Vista or Windows Server 2008 at minimum.
-#include <windows.h>
-#if defined(WINVER) && WINVER >= 0x0600
-#define MUTEX_IS_WIN32_SRWLOCK
-#endif
-#else
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200809L
-#endif
-#include <unistd.h>
-#if defined(_POSIX_READER_WRITER_LOCKS) && _POSIX_READER_WRITER_LOCKS > 0
-#define MUTEX_IS_PTHREAD_RWLOCK
-#endif
-#endif
-#endif
-
-#if defined(MUTEX_IS_LOCK_COUNTER)
-typedef int MutexType;
-#elif defined(MUTEX_IS_WIN32_SRWLOCK)
-typedef SRWLOCK MutexType;
-#elif defined(MUTEX_IS_PTHREAD_RWLOCK)
-#include <pthread.h>
-#include <stdlib.h>
-typedef pthread_rwlock_t MutexType;
-#else
-#include <mutex>
-typedef std::mutex MutexType;
-#endif
-
 namespace re2 {
 
 class Mutex {
@@ -1034,11 +1038,6 @@ class WriterMutexLock {
 
 // Not quite the Visitor pattern, because (among other things)
 // the Visitor pattern is recursive.
-
-#include <stack>
-
-#include "util/logging.h"
-#include "re2/regexp.h"
 
 namespace re2 {
 
