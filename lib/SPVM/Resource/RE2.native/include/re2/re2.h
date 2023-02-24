@@ -106,18 +106,6 @@
 // than PCRE), as do matches without submatch extraction.
 //
 // -----------------------------------------------------------------------
-// PARTIAL MATCHES
-//
-// You can use the "PartialMatch" operation when you want the pattern
-// to match any substring of the text.
-//
-// Example: simple search for a string:
-//      CHECK(RE2::PartialMatch("hello", "ell"));
-//
-// Example: find first number in a string
-//      int number;
-//      CHECK(RE2::PartialMatch("x*100 + 20", "(\\d+)", &number));
-//      CHECK_EQ(number, 100);
 //
 // -----------------------------------------------------------------------
 // PRE-COMPILED REGULAR EXPRESSIONS
@@ -271,9 +259,6 @@ class RE2 {
     Quiet // do not log about regexp parse errors
   };
 
-  // Need to have the const char* and const std::string& forms for implicit
-  // conversions when passing string literals to FullMatch and PartialMatch.
-  // Otherwise the StringPiece form would be sufficient.
   RE2(const char* pattern);
   RE2(const std::string& pattern);
   RE2(const StringPiece& pattern);
@@ -330,21 +315,6 @@ class RE2 {
   // to know about prefix_ and prefix_foldcase_.
   re2::Regexp* Regexp() const { return entire_regexp_; }
 
-  /***** The array-based matching interface ******/
-
-  // The functions here have names ending in 'N' and are used to implement
-  // the functions whose names are the prefix before the 'N'. It is sometimes
-  // useful to invoke them directly, but the syntax is awkward, so the 'N'-less
-  // versions should be preferred.
-  static bool FullMatchN(const StringPiece& text, const RE2& re,
-                         const Arg* const args[], int n);
-  static bool PartialMatchN(const StringPiece& text, const RE2& re,
-                            const Arg* const args[], int n);
-  static bool ConsumeN(StringPiece* input, const RE2& re,
-                       const Arg* const args[], int n);
-  static bool FindAndConsumeN(StringPiece* input, const RE2& re,
-                              const Arg* const args[], int n);
-
  private:
   template <typename F, typename SP>
   static inline bool Apply(F f, SP sp, const RE2& re) {
@@ -363,93 +333,6 @@ class RE2 {
   // of arguments of varying types, we use two layers of variadic templates.
   // The first layer constructs the temporary Arg objects. The second layer
   // (above) constructs the array of pointers to the temporary Arg objects.
-
-  /***** The useful part: the matching interface *****/
-
-  // Matches "text" against "re".  If pointer arguments are
-  // supplied, copies matched sub-patterns into them.
-  //
-  // You can pass in a "const char*" or a "std::string" for "text".
-  // You can pass in a "const char*" or a "std::string" or a "RE2" for "re".
-  //
-  // The provided pointer arguments can be pointers to any scalar numeric
-  // type, or one of:
-  //    std::string     (matched piece is copied to string)
-  //    StringPiece     (StringPiece is mutated to point to matched piece)
-  //    T               (where "bool T::ParseFrom(const char*, size_t)" exists)
-  //    (void*)NULL     (the corresponding matched sub-pattern is not copied)
-  //
-  // Returns true iff all of the following conditions are satisfied:
-  //   a. "text" matches "re" fully - from the beginning to the end of "text".
-  //   b. The number of matched sub-patterns is >= number of supplied pointers.
-  //   c. The "i"th argument has a suitable type for holding the
-  //      string captured as the "i"th sub-pattern.  If you pass in
-  //      NULL for the "i"th argument, or pass fewer arguments than
-  //      number of sub-patterns, the "i"th captured sub-pattern is
-  //      ignored.
-  //
-  // CAVEAT: An optional sub-pattern that does not exist in the
-  // matched string is assigned the empty string.  Therefore, the
-  // following will return false (because the empty string is not a
-  // valid number):
-  //    int number;
-  //    RE2::FullMatch("abc", "[a-z]+(\\d+)?", &number);
-  template <typename... A>
-  static bool FullMatch(const StringPiece& text, const RE2& re, A&&... a) {
-    return Apply(FullMatchN, text, re, Arg(std::forward<A>(a))...);
-  }
-
-  // Like FullMatch(), except that "re" is allowed to match a substring
-  // of "text".
-  //
-  // Returns true iff all of the following conditions are satisfied:
-  //   a. "text" matches "re" partially - for some substring of "text".
-  //   b. The number of matched sub-patterns is >= number of supplied pointers.
-  //   c. The "i"th argument has a suitable type for holding the
-  //      string captured as the "i"th sub-pattern.  If you pass in
-  //      NULL for the "i"th argument, or pass fewer arguments than
-  //      number of sub-patterns, the "i"th captured sub-pattern is
-  //      ignored.
-  template <typename... A>
-  static bool PartialMatch(const StringPiece& text, const RE2& re, A&&... a) {
-    return Apply(PartialMatchN, text, re, Arg(std::forward<A>(a))...);
-  }
-
-  // Like FullMatch() and PartialMatch(), except that "re" has to match
-  // a prefix of the text, and "input" is advanced past the matched
-  // text.  Note: "input" is modified iff this routine returns true
-  // and "re" matched a non-empty substring of "input".
-  //
-  // Returns true iff all of the following conditions are satisfied:
-  //   a. "input" matches "re" partially - for some prefix of "input".
-  //   b. The number of matched sub-patterns is >= number of supplied pointers.
-  //   c. The "i"th argument has a suitable type for holding the
-  //      string captured as the "i"th sub-pattern.  If you pass in
-  //      NULL for the "i"th argument, or pass fewer arguments than
-  //      number of sub-patterns, the "i"th captured sub-pattern is
-  //      ignored.
-  template <typename... A>
-  static bool Consume(StringPiece* input, const RE2& re, A&&... a) {
-    return Apply(ConsumeN, input, re, Arg(std::forward<A>(a))...);
-  }
-
-  // Like Consume(), but does not anchor the match at the beginning of
-  // the text.  That is, "re" need not start its match at the beginning
-  // of "input".  For example, "FindAndConsume(s, "(\\w+)", &word)" finds
-  // the next word in "s" and stores it in "word".
-  //
-  // Returns true iff all of the following conditions are satisfied:
-  //   a. "input" matches "re" partially - for some substring of "input".
-  //   b. The number of matched sub-patterns is >= number of supplied pointers.
-  //   c. The "i"th argument has a suitable type for holding the
-  //      string captured as the "i"th sub-pattern.  If you pass in
-  //      NULL for the "i"th argument, or pass fewer arguments than
-  //      number of sub-patterns, the "i"th captured sub-pattern is
-  //      ignored.
-  template <typename... A>
-  static bool FindAndConsume(StringPiece* input, const RE2& re, A&&... a) {
-    return Apply(FindAndConsumeN, input, re, Arg(std::forward<A>(a))...);
-  }
 
   // Replace the first match of "re" in "str" with "rewrite".
   // Within "rewrite", backslash-escaped digits (\1 to \9) can be
