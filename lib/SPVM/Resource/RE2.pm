@@ -150,7 +150,7 @@ Header files of C<Google/RE2> is copied into the C<include> directory by the fol
 
 The source files that is used in the config are extracted by the following command.
 
-  find * | grep -P '(util|re2)/\w+\.cc$' | grep -v -P 'util/(test|benchmark|fuzz)\.cc$' | grep -v blib
+  find lib/SPVM/Resource/RE2.native/src/* | perl -p -e 's|^\Qlib/SPVM/Resource/RE2.native/src/||' | grep -P '(util|re2)/\w+\.cc$' | grep -v -P 'util/(test|benchmark|fuzz)\.cc$' | grep -v blib
 
 =head1 Repository
 
