@@ -209,9 +209,6 @@ enum RegexpOp {
   // Matches empty string at end of text.
   kRegexpEndText,
 
-  // Matches character class given by cc_.
-  kRegexpCharClass,
-
   // Forces match of entire expression right now,
   // with match ID match_id_ (used by RE2::Set).
   kRegexpHaveMatch,
@@ -229,7 +226,6 @@ enum RegexpStatusCode {
 
   // Parse errors
   kRegexpBadEscape,          // bad escape sequence
-  kRegexpBadCharClass,       // bad character class
   kRegexpBadCharRange,       // bad character class range
   kRegexpMissingBracket,     // missing closing ]
   kRegexpMissingParen,       // missing closing )
@@ -292,40 +288,6 @@ struct RuneRangeLess {
   bool operator()(const RuneRange& a, const RuneRange& b) const {
     return a.hi < b.lo;
   }
-};
-
-class CharClassBuilder;
-
-class CharClass {
- public:
-  void Delete();
-
-  typedef RuneRange* iterator;
-  iterator begin() { return ranges_; }
-  iterator end() { return ranges_ + nranges_; }
-
-  int size() { return nrunes_; }
-  bool empty() { return nrunes_ == 0; }
-  bool full() { return nrunes_ == Runemax+1; }
-  bool FoldsASCII() { return folds_ascii_; }
-
-  bool Contains(Rune r) const;
-  CharClass* Negate();
-
- private:
-  CharClass();  // not implemented
-  ~CharClass();  // not implemented
-  static CharClass* New(size_t maxranges);
-
-  friend class CharClassBuilder;
-
-  bool folds_ascii_;
-  int nrunes_;
-  RuneRange *ranges_;
-  int nranges_;
-
-  CharClass(const CharClass&) = delete;
-  CharClass& operator=(const CharClass&) = delete;
 };
 
 class Regexp {
@@ -391,7 +353,6 @@ class Regexp {
   int min() { DCHECK_EQ(op_, kRegexpRepeat); return min_; }
   int max() { DCHECK_EQ(op_, kRegexpRepeat); return max_; }
   Rune rune() { DCHECK_EQ(op_, kRegexpLiteral); return rune_; }
-  CharClass* cc() { DCHECK_EQ(op_, kRegexpCharClass); return cc_; }
   int cap() { DCHECK_EQ(op_, kRegexpCapture); return cap_; }
   const std::string* name() { DCHECK_EQ(op_, kRegexpCapture); return name_; }
   Rune* runes() { DCHECK_EQ(op_, kRegexpLiteralString); return runes_; }
@@ -456,7 +417,6 @@ class Regexp {
   static Regexp* Capture(Regexp* sub, ParseFlags flags, int cap);
   static Regexp* Repeat(Regexp* sub, ParseFlags flags, int min, int max);
   static Regexp* NewLiteral(Rune rune, ParseFlags flags);
-  static Regexp* NewCharClass(CharClass* cc, ParseFlags flags);
   static Regexp* LiteralString(Rune* runes, int nrunes, ParseFlags flags);
   static Regexp* HaveMatch(int match_id, ParseFlags flags);
 
@@ -522,8 +482,6 @@ class Regexp {
   class ParseState;
 
   friend class ParseState;
-  friend bool ParseCharClass(StringPiece* s, Regexp** out_re,
-                             RegexpStatus* status);
 
   // Helper for testing [sic].
   friend bool RegexpEqualTestingOnly(Regexp*, Regexp*);
@@ -637,13 +595,6 @@ class Regexp {
     struct {  // LiteralString
       int nrunes_;
       Rune* runes_;
-    };
-    struct {  // CharClass
-      // These two could be in separate union members,
-      // but it wouldn't save any space (there are other two-word structs)
-      // and keeping them separate avoids confusion during parsing.
-      CharClass* cc_;
-      CharClassBuilder* ccb_;
     };
     Rune rune_;  // Literal
     int match_id_;  // HaveMatch
@@ -876,7 +827,6 @@ class RE2 {
 
     // Parse errors
     ErrorBadEscape,          // bad escape sequence
-    ErrorBadCharClass,       // bad character class
     ErrorBadCharRange,       // bad character class range
     ErrorMissingBracket,     // missing closing ]
     ErrorMissingParen,       // missing closing )
