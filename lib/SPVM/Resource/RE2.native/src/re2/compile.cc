@@ -1113,9 +1113,7 @@ Prog* Compiler::Compile(Regexp* re, bool reversed, int64_t max_mem) {
   c.Setup(re->parse_flags(), max_mem, RE2::UNANCHORED /* unused */);
   c.reversed_ = reversed;
 
-  // Simplify to remove things like counted repetitions
-  // and character classes like \d.
-  Regexp* sre = re->Simplify();
+  Regexp* sre = re;
   if (sre == NULL)
     return NULL;
 
@@ -1216,7 +1214,7 @@ Prog* Compiler::CompileSet(Regexp* re, RE2::Anchor anchor, int64_t max_mem) {
   Compiler c;
   c.Setup(re->parse_flags(), max_mem, anchor);
 
-  Regexp* sre = re->Simplify();
+  Regexp* sre = re;
   if (sre == NULL)
     return NULL;
 

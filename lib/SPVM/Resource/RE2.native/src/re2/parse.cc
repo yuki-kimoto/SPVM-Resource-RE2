@@ -259,8 +259,6 @@ bool Regexp::ParseState::PushRegexp(Regexp* re) {
     }
   }
 
-  if (!IsMarker(re->op()))
-    re->simple_ = re->ComputeSimple();
   re->down_ = stacktop_;
   stacktop_ = re;
   return true;
@@ -503,7 +501,6 @@ bool Regexp::ParseState::PushRepeatOp(RegexpOp op, const StringPiece& s,
   re->AllocSub(1);
   re->down_ = stacktop_->down_;
   re->sub()[0] = FinishRegexp(stacktop_);
-  re->simple_ = re->ComputeSimple();
   stacktop_ = re;
   return true;
 }
@@ -589,7 +586,6 @@ bool Regexp::ParseState::PushRepetition(int min, int max,
   re->AllocSub(1);
   re->down_ = stacktop_->down_;
   re->sub()[0] = FinishRegexp(stacktop_);
-  re->simple_ = re->ComputeSimple();
   stacktop_ = re;
   if (min >= 2 || max >= 2) {
     RepetitionWalker w;
@@ -705,7 +701,6 @@ bool Regexp::ParseState::DoRightParen() {
     // re->cap_ is already set
     re->AllocSub(1);
     re->sub()[0] = FinishRegexp(r1);
-    re->simple_ = re->ComputeSimple();
   } else {
     re->Decref();
     re = r1;
@@ -1237,7 +1232,6 @@ void Regexp::ParseState::DoCollapse(RegexpOp op) {
   }
 
   Regexp* re = ConcatOrAlternate(op, subs.data(), n, flags_, true);
-  re->simple_ = re->ComputeSimple();
   re->down_ = next;
   stacktop_ = re;
 }
