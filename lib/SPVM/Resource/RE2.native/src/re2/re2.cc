@@ -21,31 +21,11 @@ namespace re2 {
 // that could cause arbitrarily deep recursion, so
 // required Decref() to have handled them for us.
 Regexp::~Regexp() {
-  if (nsub_ > 0)
-    LOG(DFATAL) << "Regexp not destroyed.";
-
-  switch (op_) {
-    default:
-      break;
-    case kRegexpCapture:
-      delete name_;
-      break;
-    case kRegexpLiteralString:
-      delete[] runes_;
-      break;
-    case kRegexpCharClass:
-      break;
-  }
 }
 
 // If it's possible to destroy this regexp without recurring,
 // do so and return true.  Else return false.
 bool Regexp::QuickDestroy() {
-  if (nsub_ == 0) {
-    delete this;
-    return true;
-  }
-  return false;
 }
 
 // Similar to EmptyStorage in re2.cc.
@@ -65,21 +45,6 @@ static inline std::map<Regexp*, int>* ref_map() {
 
 // Decrements reference count and deletes this object if count reaches 0.
 void Regexp::Decref() {
-  if (ref_ == kMaxRef) {
-    // Ref count is stored in overflow map.
-    MutexLock l(ref_mutex());
-    int r = (*ref_map())[this] - 1;
-    if (r < kMaxRef) {
-      ref_ = static_cast<uint16_t>(r);
-      ref_map()->erase(this);
-    } else {
-      (*ref_map())[this] = r;
-    }
-    return;
-  }
-  ref_--;
-  if (ref_ == 0)
-    Destroy();
 }
 
 // Deletes this object; ref count has count reached 0.
