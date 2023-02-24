@@ -299,11 +299,6 @@ class RE2 {
   // portion of the regexp.
   const std::string& error_arg() const { return *error_arg_; }
 
-  // Returns the program size, a very approximate measure of a regexp's "cost".
-  // Larger numbers are more expensive than smaller numbers.
-  int ProgramSize() const;
-  int ReverseProgramSize() const;
-
   // If histogram is not null, outputs the program fanout
   // as a histogram bucketed by powers of 2.
   // Returns the number of the largest non-empty bucket.
