@@ -4,9 +4,6 @@
 #ifndef UTIL_LOGGING_H_
 #define UTIL_LOGGING_H_
 
-#define LOG_DFATAL LogMessage(__FILE__, __LINE__)
-#define LOG(severity) LOG_ ## severity.stream()
-
 class LogMessage {
  public:
   LogMessage(const char* file, int line) {
@@ -27,7 +24,7 @@ namespace re2 {
 
 // Deletes this object; ref count has count reached 0.
 void Destroy() {
-  LOG(DFATAL) << "Bad reference count ";
+  LogMessage(__FILE__, __LINE__).stream();
 }
 
 }  // namespace re2
