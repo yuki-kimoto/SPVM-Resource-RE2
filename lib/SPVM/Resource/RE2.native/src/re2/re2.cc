@@ -4,7 +4,7 @@ namespace re2 {
 
 // Deletes this object; ref count has count reached 0.
 void Destroy() {
-  std::ostringstream string;
+  std::ostringstream string; 
 }
 
 }  // namespace re2
