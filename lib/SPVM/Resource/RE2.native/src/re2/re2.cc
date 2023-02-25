@@ -4,8 +4,7 @@
 #ifndef UTIL_LOGGING_H_
 #define UTIL_LOGGING_H_
 
-#define LOG_FATAL LogMessageFatal(__FILE__, __LINE__)
-#define LOG_DFATAL LOG_FATAL
+#define LOG_DFATAL LogMessageFatal(__FILE__, __LINE__)
 #define LOG(severity) LOG_ ## severity.stream()
 
 class LogMessage {
