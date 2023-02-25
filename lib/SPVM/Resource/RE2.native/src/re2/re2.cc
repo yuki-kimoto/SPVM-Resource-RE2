@@ -790,24 +790,6 @@ class WriterMutexLock {
 
 namespace re2 {
 
-Regexp::~Regexp() {
-}
-
-// Similar to EmptyStorage in re2.cc.
-struct RefStorage {
-  Mutex ref_mutex;
-  std::map<Regexp*, int> ref_map;
-};
-alignas(RefStorage) static char ref_storage[sizeof(RefStorage)];
-
-static inline Mutex* ref_mutex() {
-  return &reinterpret_cast<RefStorage*>(ref_storage)->ref_mutex;
-}
-
-static inline std::map<Regexp*, int>* ref_map() {
-  return &reinterpret_cast<RefStorage*>(ref_storage)->ref_map;
-}
-
 // Deletes this object; ref count has count reached 0.
 void Regexp::Destroy() {
   LOG(DFATAL) << "Bad reference count ";
