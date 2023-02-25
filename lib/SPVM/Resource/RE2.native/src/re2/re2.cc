@@ -1,9 +1,5 @@
 #include <sstream>
 
-
-#ifndef UTIL_LOGGING_H_
-#define UTIL_LOGGING_H_
-
 class LogMessage {
  public:
   LogMessage(const char* file, int line) {
@@ -17,8 +13,6 @@ class LogMessage {
  private:
   std::ostringstream str_;
 };
-
-#endif  // UTIL_LOGGING_H_
 
 namespace re2 {
 
