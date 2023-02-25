@@ -77,36 +77,6 @@ typedef std::mutex MutexType;
 #include <TargetConditionals.h>
 #endif
 
-#ifndef UTIL_UTF_H_
-#define UTIL_UTF_H_
-
-namespace re2 {
-
-typedef signed int Rune;	/* Code-point values in Unicode 4.0 are 21 bits wide.*/
-
-enum
-{
-  UTFmax	= 4,		/* maximum bytes per rune */
-  Runesync	= 0x80,		/* cannot represent part of a UTF sequence (<) */
-  Runeself	= 0x80,		/* rune and UTF sequences are the same (<) */
-  Runeerror	= 0xFFFD,	/* decoding error in UTF */
-  Runemax	= 0x10FFFF,	/* maximum rune value */
-};
-
-int runetochar(char* s, const Rune* r);
-int chartorune(Rune* r, const char* s);
-int fullrune(const char* s, int n);
-int utflen(const char* s);
-char* utfrune(const char*, Rune);
-
-}  // namespace re2
-
-#endif  // UTIL_UTF_H_
-
-// Copyright 2001-2010 The RE2 Authors.  All Rights Reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 #ifndef RE2_STRINGPIECE_H_
 #define RE2_STRINGPIECE_H_
 
