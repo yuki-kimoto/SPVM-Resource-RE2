@@ -810,31 +810,7 @@ static inline std::map<Regexp*, int>* ref_map() {
 
 // Deletes this object; ref count has count reached 0.
 void Regexp::Destroy() {
-
-  // Handle recursive Destroy with explicit stack
-  // to avoid arbitrarily deep recursion on process stack [sigh].
-  down_ = NULL;
-  Regexp* stack = this;
-  while (stack != NULL) {
-    Regexp* re = stack;
-    stack = re->down_;
-    if (re->ref_ != 0)
-      LOG(DFATAL) << "Bad reference count " << re->ref_;
-    if (re->nsub_ > 0) {
-      Regexp** subs = re->sub();
-      for (int i = 0; i < re->nsub_; i++) {
-        Regexp* sub = subs[i];
-        if (sub == NULL)
-          continue;
-        else
-          --sub->ref_;
-      }
-      if (re->nsub_ > 1)
-        delete[] subs;
-      re->nsub_ = 0;
-    }
-    delete re;
-  }
+  LOG(DFATAL) << "Bad reference count ";
 }
 
 }  // namespace re2
