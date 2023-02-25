@@ -22,11 +22,6 @@ class LogMessage {
   std::ostringstream str_;
 };
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4722)
-#endif
-
 class LogMessageFatal : public LogMessage {
  public:
   LogMessageFatal(const char* file, int line)
@@ -39,10 +34,6 @@ class LogMessageFatal : public LogMessage {
   LogMessageFatal(const LogMessageFatal&) = delete;
   LogMessageFatal& operator=(const LogMessageFatal&) = delete;
 };
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
 #endif  // UTIL_LOGGING_H_
 
