@@ -30,10 +30,415 @@
 #include <string>
 
 
-#include "util/util.h"
-#include "util/logging.h"
-#include "util/utf.h"
-#include "re2/stringpiece.h"
+// Copyright 2009 The RE2 Authors.  All Rights Reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+#ifndef UTIL_UTIL_H_
+#define UTIL_UTIL_H_
+
+#define arraysize(array) (sizeof(array)/sizeof((array)[0]))
+
+#ifndef ATTRIBUTE_NORETURN
+#if defined(__GNUC__)
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_NORETURN __declspec(noreturn)
+#else
+#define ATTRIBUTE_NORETURN
+#endif
+#endif
+
+#ifndef ATTRIBUTE_UNUSED
+#if defined(__GNUC__)
+#define ATTRIBUTE_UNUSED __attribute__((unused))
+#else
+#define ATTRIBUTE_UNUSED
+#endif
+#endif
+
+#ifndef FALLTHROUGH_INTENDED
+#if defined(__clang__)
+#define FALLTHROUGH_INTENDED [[clang::fallthrough]]
+#elif defined(__GNUC__) && __GNUC__ >= 7
+#define FALLTHROUGH_INTENDED [[gnu::fallthrough]]
+#else
+#define FALLTHROUGH_INTENDED do {} while (0)
+#endif
+#endif
+
+#ifndef NO_THREAD_SAFETY_ANALYSIS
+#define NO_THREAD_SAFETY_ANALYSIS
+#endif
+
+#endif  // UTIL_UTIL_H_
+
+// Copyright 2009 The RE2 Authors.  All Rights Reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+#ifndef UTIL_LOGGING_H_
+#define UTIL_LOGGING_H_
+
+// Simplified version of Google's logging.
+
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <ostream>
+#include <sstream>
+
+// Debug-only checking.
+#define DCHECK(condition) assert(condition)
+#define DCHECK_EQ(val1, val2) assert((val1) == (val2))
+#define DCHECK_NE(val1, val2) assert((val1) != (val2))
+#define DCHECK_LE(val1, val2) assert((val1) <= (val2))
+#define DCHECK_LT(val1, val2) assert((val1) < (val2))
+#define DCHECK_GE(val1, val2) assert((val1) >= (val2))
+#define DCHECK_GT(val1, val2) assert((val1) > (val2))
+
+// Always-on checking
+#define CHECK(x)	if(x){}else LogMessageFatal(__FILE__, __LINE__).stream() << "Check failed: " #x
+#define CHECK_LT(x, y)	CHECK((x) < (y))
+#define CHECK_GT(x, y)	CHECK((x) > (y))
+#define CHECK_LE(x, y)	CHECK((x) <= (y))
+#define CHECK_GE(x, y)	CHECK((x) >= (y))
+#define CHECK_EQ(x, y)	CHECK((x) == (y))
+#define CHECK_NE(x, y)	CHECK((x) != (y))
+
+#define LOG_INFO LogMessage(__FILE__, __LINE__)
+#define LOG_WARNING LogMessage(__FILE__, __LINE__)
+#define LOG_ERROR LogMessage(__FILE__, __LINE__)
+#define LOG_FATAL LogMessageFatal(__FILE__, __LINE__)
+#define LOG_QFATAL LOG_FATAL
+
+// It seems that one of the Windows header files defines ERROR as 0.
+#ifdef _WIN32
+#define LOG_0 LOG_INFO
+#endif
+
+#ifdef NDEBUG
+#define LOG_DFATAL LOG_ERROR
+#else
+#define LOG_DFATAL LOG_FATAL
+#endif
+
+#define LOG(severity) LOG_ ## severity.stream()
+
+#define VLOG(x) if((x)>0){}else LOG_INFO.stream()
+
+class LogMessage {
+ public:
+  LogMessage(const char* file, int line)
+      : flushed_(false) {
+    stream() << file << ":" << line << ": ";
+  }
+  void Flush() {
+    stream() << "\n";
+    std::string s = str_.str();
+    size_t n = s.size();
+    if (fwrite(s.data(), 1, n, stderr) < n) {}  // shut up gcc
+    flushed_ = true;
+  }
+  ~LogMessage() {
+    if (!flushed_) {
+      Flush();
+    }
+  }
+  std::ostream& stream() { return str_; }
+
+ private:
+  bool flushed_;
+  std::ostringstream str_;
+
+  LogMessage(const LogMessage&) = delete;
+  LogMessage& operator=(const LogMessage&) = delete;
+};
+
+// Silence "destructor never returns" warning for ~LogMessageFatal().
+// Since this is a header file, push and then pop to limit the scope.
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4722)
+#endif
+
+class LogMessageFatal : public LogMessage {
+ public:
+  LogMessageFatal(const char* file, int line)
+      : LogMessage(file, line) {}
+  ATTRIBUTE_NORETURN ~LogMessageFatal() {
+    Flush();
+    abort();
+  }
+ private:
+  LogMessageFatal(const LogMessageFatal&) = delete;
+  LogMessageFatal& operator=(const LogMessageFatal&) = delete;
+};
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
+#endif  // UTIL_LOGGING_H_
+
+/*
+ * The authors of this software are Rob Pike and Ken Thompson.
+ *              Copyright (c) 2002 by Lucent Technologies.
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose without fee is hereby granted, provided that this entire notice
+ * is included in all copies of any software which is or includes a copy
+ * or modification of this software and in all copies of the supporting
+ * documentation for such software.
+ * THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
+ * WARRANTY.  IN PARTICULAR, NEITHER THE AUTHORS NOR LUCENT TECHNOLOGIES MAKE ANY
+ * REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
+ * OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
+ *
+ * This file and rune.cc have been converted to compile as C++ code
+ * in name space re2.
+ */
+
+#ifndef UTIL_UTF_H_
+#define UTIL_UTF_H_
+
+#include <stdint.h>
+
+namespace re2 {
+
+typedef signed int Rune;	/* Code-point values in Unicode 4.0 are 21 bits wide.*/
+
+enum
+{
+  UTFmax	= 4,		/* maximum bytes per rune */
+  Runesync	= 0x80,		/* cannot represent part of a UTF sequence (<) */
+  Runeself	= 0x80,		/* rune and UTF sequences are the same (<) */
+  Runeerror	= 0xFFFD,	/* decoding error in UTF */
+  Runemax	= 0x10FFFF,	/* maximum rune value */
+};
+
+int runetochar(char* s, const Rune* r);
+int chartorune(Rune* r, const char* s);
+int fullrune(const char* s, int n);
+int utflen(const char* s);
+char* utfrune(const char*, Rune);
+
+}  // namespace re2
+
+#endif  // UTIL_UTF_H_
+
+// Copyright 2001-2010 The RE2 Authors.  All Rights Reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+#ifndef RE2_STRINGPIECE_H_
+#define RE2_STRINGPIECE_H_
+
+// A string-like object that points to a sized piece of memory.
+//
+// Functions or methods may use const StringPiece& parameters to accept either
+// a "const char*" or a "string" value that will be implicitly converted to
+// a StringPiece.  The implicit conversion means that it is often appropriate
+// to include this .h file in other files rather than forward-declaring
+// StringPiece as would be appropriate for most other Google classes.
+//
+// Systematic usage of StringPiece is encouraged as it will reduce unnecessary
+// conversions from "const char*" to "string" and back again.
+//
+//
+// Arghh!  I wish C++ literals were "string".
+
+#include <stddef.h>
+#include <string.h>
+#include <algorithm>
+#include <iosfwd>
+#include <iterator>
+#include <string>
+#ifdef __cpp_lib_string_view
+#include <string_view>
+#endif
+
+namespace re2 {
+
+class StringPiece {
+ public:
+  typedef std::char_traits<char> traits_type;
+  typedef char value_type;
+  typedef char* pointer;
+  typedef const char* const_pointer;
+  typedef char& reference;
+  typedef const char& const_reference;
+  typedef const char* const_iterator;
+  typedef const_iterator iterator;
+  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+  typedef const_reverse_iterator reverse_iterator;
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  static const size_type npos = static_cast<size_type>(-1);
+
+  // We provide non-explicit singleton constructors so users can pass
+  // in a "const char*" or a "string" wherever a "StringPiece" is
+  // expected.
+  StringPiece()
+      : data_(NULL), size_(0) {}
+#ifdef __cpp_lib_string_view
+  StringPiece(const std::string_view& str)
+      : data_(str.data()), size_(str.size()) {}
+#endif
+  StringPiece(const std::string& str)
+      : data_(str.data()), size_(str.size()) {}
+  StringPiece(const char* str)
+      : data_(str), size_(str == NULL ? 0 : strlen(str)) {}
+  StringPiece(const char* str, size_type len)
+      : data_(str), size_(len) {}
+
+  const_iterator begin() const { return data_; }
+  const_iterator end() const { return data_ + size_; }
+  const_reverse_iterator rbegin() const {
+    return const_reverse_iterator(data_ + size_);
+  }
+  const_reverse_iterator rend() const {
+    return const_reverse_iterator(data_);
+  }
+
+  size_type size() const { return size_; }
+  size_type length() const { return size_; }
+  bool empty() const { return size_ == 0; }
+
+  const_reference operator[](size_type i) const { return data_[i]; }
+  const_pointer data() const { return data_; }
+
+  void remove_prefix(size_type n) {
+    data_ += n;
+    size_ -= n;
+  }
+
+  void remove_suffix(size_type n) {
+    size_ -= n;
+  }
+
+  void set(const char* str) {
+    data_ = str;
+    size_ = str == NULL ? 0 : strlen(str);
+  }
+
+  void set(const char* str, size_type len) {
+    data_ = str;
+    size_ = len;
+  }
+
+#ifdef __cpp_lib_string_view
+  // Converts to `std::basic_string_view`.
+  operator std::basic_string_view<char, traits_type>() const {
+    if (!data_) return {};
+    return std::basic_string_view<char, traits_type>(data_, size_);
+  }
+#endif
+
+  // Converts to `std::basic_string`.
+  template <typename A>
+  explicit operator std::basic_string<char, traits_type, A>() const {
+    if (!data_) return {};
+    return std::basic_string<char, traits_type, A>(data_, size_);
+  }
+
+  std::string as_string() const {
+    return std::string(data_, size_);
+  }
+
+  // We also define ToString() here, since many other string-like
+  // interfaces name the routine that converts to a C++ string
+  // "ToString", and it's confusing to have the method that does that
+  // for a StringPiece be called "as_string()".  We also leave the
+  // "as_string()" method defined here for existing code.
+  std::string ToString() const {
+    return std::string(data_, size_);
+  }
+
+  void CopyToString(std::string* target) const {
+    target->assign(data_, size_);
+  }
+
+  void AppendToString(std::string* target) const {
+    target->append(data_, size_);
+  }
+
+  size_type copy(char* buf, size_type n, size_type pos = 0) const;
+  StringPiece substr(size_type pos = 0, size_type n = npos) const;
+
+  int compare(const StringPiece& x) const {
+    size_type min_size = std::min(size(), x.size());
+    if (min_size > 0) {
+      int r = memcmp(data(), x.data(), min_size);
+      if (r < 0) return -1;
+      if (r > 0) return 1;
+    }
+    if (size() < x.size()) return -1;
+    if (size() > x.size()) return 1;
+    return 0;
+  }
+
+  // Does "this" start with "x"?
+  bool starts_with(const StringPiece& x) const {
+    return x.empty() ||
+           (size() >= x.size() && memcmp(data(), x.data(), x.size()) == 0);
+  }
+
+  // Does "this" end with "x"?
+  bool ends_with(const StringPiece& x) const {
+    return x.empty() ||
+           (size() >= x.size() &&
+            memcmp(data() + (size() - x.size()), x.data(), x.size()) == 0);
+  }
+
+  bool contains(const StringPiece& s) const {
+    return find(s) != npos;
+  }
+
+  size_type find(const StringPiece& s, size_type pos = 0) const;
+  size_type find(char c, size_type pos = 0) const;
+  size_type rfind(const StringPiece& s, size_type pos = npos) const;
+  size_type rfind(char c, size_type pos = npos) const;
+
+ private:
+  const_pointer data_;
+  size_type size_;
+};
+
+inline bool operator==(const StringPiece& x, const StringPiece& y) {
+  StringPiece::size_type len = x.size();
+  if (len != y.size()) return false;
+  return x.data() == y.data() || len == 0 ||
+         memcmp(x.data(), y.data(), len) == 0;
+}
+
+inline bool operator!=(const StringPiece& x, const StringPiece& y) {
+  return !(x == y);
+}
+
+inline bool operator<(const StringPiece& x, const StringPiece& y) {
+  StringPiece::size_type min_size = std::min(x.size(), y.size());
+  int r = min_size == 0 ? 0 : memcmp(x.data(), y.data(), min_size);
+  return (r < 0) || (r == 0 && x.size() < y.size());
+}
+
+inline bool operator>(const StringPiece& x, const StringPiece& y) {
+  return y < x;
+}
+
+inline bool operator<=(const StringPiece& x, const StringPiece& y) {
+  return !(x > y);
+}
+
+inline bool operator>=(const StringPiece& x, const StringPiece& y) {
+  return !(x < y);
+}
+
+// Allow StringPiece to be logged.
+std::ostream& operator<<(std::ostream& o, const StringPiece& p);
+
+}  // namespace re2
+
+#endif  // RE2_STRINGPIECE_H_
 
 #ifdef RE2_NO_THREADS
 #include <assert.h>
