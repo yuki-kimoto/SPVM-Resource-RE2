@@ -4,7 +4,7 @@
 #ifndef UTIL_LOGGING_H_
 #define UTIL_LOGGING_H_
 
-#define LOG_DFATAL LogMessageFatal(__FILE__, __LINE__)
+#define LOG_DFATAL LogMessage(__FILE__, __LINE__)
 #define LOG(severity) LOG_ ## severity.stream()
 
 class LogMessage {
@@ -19,19 +19,6 @@ class LogMessage {
 
  private:
   std::ostringstream str_;
-};
-
-class LogMessageFatal : public LogMessage {
- public:
-  LogMessageFatal(const char* file, int line)
-      : LogMessage(file, line) {}
-    ~LogMessageFatal() {
-    Flush();
-    abort();
-  }
- private:
-  LogMessageFatal(const LogMessageFatal&) = delete;
-  LogMessageFatal& operator=(const LogMessageFatal&) = delete;
 };
 
 #endif  // UTIL_LOGGING_H_
