@@ -1,12 +1,3 @@
-// Copyright 2003-2009 The RE2 Authors.  All Rights Reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// Regular expression interface RE2.
-//
-// Originally the PCRE C++ wrapper, but adapted to use
-// the new automata-based regular expression engines.
-
 #include <atomic>
 #include <stack>
 #include <stddef.h>
@@ -687,19 +678,6 @@ void Regexp::Destroy() {
   while (stack != NULL) {
     Regexp* re = stack;
     stack = re->down_;
-    if (re->nsub_ > 0) {
-      Regexp** subs = re->sub();
-      for (int i = 0; i < re->nsub_; i++) {
-        Regexp* sub = subs[i];
-        if (sub == NULL)
-          continue;
-        else
-          --sub->ref_;
-      }
-      if (re->nsub_ > 1)
-        delete[] subs;
-      re->nsub_ = 0;
-    }
     delete re;
   }
 }
