@@ -2,11 +2,8 @@
 
 class LogMessage {
  public:
-  LogMessage(const char* file, int line) {
-    stream() << file << ":" << line << ": ";
-  }
-  void Flush() {
-    std::string s = str_.str();
+  LogMessage() {
+  
   }
   std::ostream& stream() { return str_; }
 
@@ -18,7 +15,7 @@ namespace re2 {
 
 // Deletes this object; ref count has count reached 0.
 void Destroy() {
-  LogMessage(__FILE__, __LINE__).stream();
+  LogMessage().stream();
 }
 
 }  // namespace re2
