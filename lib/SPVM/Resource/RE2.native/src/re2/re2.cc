@@ -28,6 +28,57 @@
 #include <iosfwd>
 #include <iterator>
 #include <string>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <ostream>
+#include <sstream>
+#include <stdint.h>
+#include <iosfwd>
+#include <iterator>
+#ifdef __cpp_lib_string_view
+#include <string_view>
+#endif
+#ifdef RE2_NO_THREADS
+#include <assert.h>
+#define MUTEX_IS_LOCK_COUNTER
+#else
+#ifdef _WIN32
+// Requires Windows Vista or Windows Server 2008 at minimum.
+#include <windows.h>
+#if defined(WINVER) && WINVER >= 0x0600
+#define MUTEX_IS_WIN32_SRWLOCK
+#endif
+#else
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#include <unistd.h>
+#if defined(_POSIX_READER_WRITER_LOCKS) && _POSIX_READER_WRITER_LOCKS > 0
+#define MUTEX_IS_PTHREAD_RWLOCK
+#endif
+#endif
+#endif
+
+#if defined(MUTEX_IS_LOCK_COUNTER)
+typedef int MutexType;
+#elif defined(MUTEX_IS_WIN32_SRWLOCK)
+typedef SRWLOCK MutexType;
+#elif defined(MUTEX_IS_PTHREAD_RWLOCK)
+#include <pthread.h>
+#include <stdlib.h>
+typedef pthread_rwlock_t MutexType;
+#else
+#include <mutex>
+typedef std::mutex MutexType;
+#endif
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+
+
 
 
 // Copyright 2009 The RE2 Authors.  All Rights Reserved.
@@ -81,12 +132,6 @@
 #define UTIL_LOGGING_H_
 
 // Simplified version of Google's logging.
-
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <ostream>
-#include <sstream>
 
 // Debug-only checking.
 #define DCHECK(condition) assert(condition)
@@ -181,27 +226,8 @@ class LogMessageFatal : public LogMessage {
 
 #endif  // UTIL_LOGGING_H_
 
-/*
- * The authors of this software are Rob Pike and Ken Thompson.
- *              Copyright (c) 2002 by Lucent Technologies.
- * Permission to use, copy, modify, and distribute this software for any
- * purpose without fee is hereby granted, provided that this entire notice
- * is included in all copies of any software which is or includes a copy
- * or modification of this software and in all copies of the supporting
- * documentation for such software.
- * THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
- * WARRANTY.  IN PARTICULAR, NEITHER THE AUTHORS NOR LUCENT TECHNOLOGIES MAKE ANY
- * REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
- * OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
- *
- * This file and rune.cc have been converted to compile as C++ code
- * in name space re2.
- */
-
 #ifndef UTIL_UTF_H_
 #define UTIL_UTF_H_
-
-#include <stdint.h>
 
 namespace re2 {
 
@@ -232,30 +258,6 @@ char* utfrune(const char*, Rune);
 
 #ifndef RE2_STRINGPIECE_H_
 #define RE2_STRINGPIECE_H_
-
-// A string-like object that points to a sized piece of memory.
-//
-// Functions or methods may use const StringPiece& parameters to accept either
-// a "const char*" or a "string" value that will be implicitly converted to
-// a StringPiece.  The implicit conversion means that it is often appropriate
-// to include this .h file in other files rather than forward-declaring
-// StringPiece as would be appropriate for most other Google classes.
-//
-// Systematic usage of StringPiece is encouraged as it will reduce unnecessary
-// conversions from "const char*" to "string" and back again.
-//
-//
-// Arghh!  I wish C++ literals were "string".
-
-#include <stddef.h>
-#include <string.h>
-#include <algorithm>
-#include <iosfwd>
-#include <iterator>
-#include <string>
-#ifdef __cpp_lib_string_view
-#include <string_view>
-#endif
 
 namespace re2 {
 
@@ -440,43 +442,6 @@ std::ostream& operator<<(std::ostream& o, const StringPiece& p);
 
 #endif  // RE2_STRINGPIECE_H_
 
-#ifdef RE2_NO_THREADS
-#include <assert.h>
-#define MUTEX_IS_LOCK_COUNTER
-#else
-#ifdef _WIN32
-// Requires Windows Vista or Windows Server 2008 at minimum.
-#include <windows.h>
-#if defined(WINVER) && WINVER >= 0x0600
-#define MUTEX_IS_WIN32_SRWLOCK
-#endif
-#else
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200809L
-#endif
-#include <unistd.h>
-#if defined(_POSIX_READER_WRITER_LOCKS) && _POSIX_READER_WRITER_LOCKS > 0
-#define MUTEX_IS_PTHREAD_RWLOCK
-#endif
-#endif
-#endif
-
-#if defined(MUTEX_IS_LOCK_COUNTER)
-typedef int MutexType;
-#elif defined(MUTEX_IS_WIN32_SRWLOCK)
-typedef SRWLOCK MutexType;
-#elif defined(MUTEX_IS_PTHREAD_RWLOCK)
-#include <pthread.h>
-#include <stdlib.h>
-typedef pthread_rwlock_t MutexType;
-#else
-#include <mutex>
-typedef std::mutex MutexType;
-#endif
-
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
 
 // Copyright 2006 The RE2 Authors.  All Rights Reserved.
 // Use of this source code is governed by a BSD-style
