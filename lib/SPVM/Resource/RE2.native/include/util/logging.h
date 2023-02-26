@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ostream>
-#include <sstream>
+#include <strstream>
 
 #include "util/util.h"
 
@@ -76,7 +76,7 @@ class LogMessage {
 
  private:
   bool flushed_;
-  std::basic_ostringstream<char> str_;
+  std::strstream str_;
 
   LogMessage(const LogMessage&) = delete;
   LogMessage& operator=(const LogMessage&) = delete;
