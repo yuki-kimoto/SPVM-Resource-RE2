@@ -138,7 +138,7 @@ The config of C<Resource::RE2>.
 
 All files of C<Google/RE2> is copied by the following steps into the C<src> directory.
 
-  rsync -av original.tmp/re2/ lib/SPVM/Resource/RE2.native/src/
+  rsync -av --exclude='*.h' original.tmp/re2/ lib/SPVM/Resource/RE2.native/src/
 
 =head1 Header Files
 
