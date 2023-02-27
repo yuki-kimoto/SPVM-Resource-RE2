@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
+      - run: echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $Env:GITHUB_PATH
       - name: Perl version
         run: perl -V
       - name: Perl config
