@@ -6,6 +6,10 @@ use Config;
 use File::Temp();
 use Getopt::Long 'GetOptions';
 
+my $cmd = "g++ -O0 -o sstream sstream.cpp -std=gnu++17";
+system($cmd) == 0
+  or die "$cmd";
+
 GetOptions(
   'meta' => \my $meta,
   'no-build-spvm-modules' => \my $no_build_spvm_modules,
