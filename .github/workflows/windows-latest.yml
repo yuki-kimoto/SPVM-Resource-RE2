@@ -13,8 +13,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      - name: choco upgrade mingw
-        run: choco upgrade mingw
+      - name: gcc --version
+        run: gcc --version
       - name: Perl version
         run: perl -V
       - name: Perl config
