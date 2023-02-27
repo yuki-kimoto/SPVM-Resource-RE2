@@ -11,6 +11,10 @@ GetOptions(
   'no-build-spvm-modules' => \my $no_build_spvm_modules,
 );
 
+my $cmd = "g++ -std=gnu++11 -o main main.cc lib/SPVM/Resource/RE2.native/src/re2/re2.cc -I lib/SPVM/Resource/RE2.native/include";
+system($cmd) == 0
+  or die "Fail: $cmd;";
+
 if ($meta) {
   $no_build_spvm_modules = 1;
 }
