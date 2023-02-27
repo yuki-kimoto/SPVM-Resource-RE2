@@ -16,5 +16,5 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: g++ --version
-      - run: g++ -O0 -o sstream sstream.cpp -std=gnu++17
+      - run: g++ -O0 -o sstream.exe sstream.cpp -std=gnu++17
       - run: sstream.exe
