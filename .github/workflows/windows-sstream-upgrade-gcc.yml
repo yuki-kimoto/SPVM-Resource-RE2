@@ -1,4 +1,4 @@
-name: Windows g++ sstream
+name: Windows g++ sstream + upgrade gcc
 on:
   push:
     branches:
