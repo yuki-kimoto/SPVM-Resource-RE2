@@ -10,6 +10,19 @@ my $cmd = "g++ -O0 -o sstream sstream.cpp -std=gnu++17";
 system($cmd) == 0
   or die "$cmd";
 
+if ($^O eq 'MSWin32') {
+  warn "EXECUTE";
+  my $execute = "sstream.exe";
+  system($execute) == 0
+    or die "$execute";
+}
+else {
+  warn "EXECUTE";
+  my $execute = "./sstream";
+  system($execute) == 0
+    or die "$execute";
+}
+
 GetOptions(
   'meta' => \my $meta,
   'no-build-spvm-modules' => \my $no_build_spvm_modules,
