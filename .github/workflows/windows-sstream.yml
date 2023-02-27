@@ -1,7 +1,11 @@
 name: Windows g++ sstream
 on:
   push:
-    branches: [main]
+    branches:
+      - '*'
+    tags-ignore:
+      - '*'
+  pull_request:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
