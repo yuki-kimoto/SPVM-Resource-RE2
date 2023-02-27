@@ -3,7 +3,7 @@
 int main() {
   std::ostringstream str;
   
-  str << "test"
+  str << "test";
   
   return 0;
 }
