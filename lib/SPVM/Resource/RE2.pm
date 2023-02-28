@@ -39,18 +39,17 @@ C<MyRE2.cpp>
   }
 
 C<MyRE2.config>
-
-  use strict;
-  use warnings;
   
-  my $config = SPVM::Builder::Config->new_cpp11(file => __FILE__);
+  my $config = SPVM::Builder::Config->new_cpp17(file => __FILE__);
   
-  $config->use_resource('Resource::RE2');
-
-  $config->add_libs('stdc++', 'pthread');
+  my $resource = $config->use_resource('Resource::RE2');
+  
+  if ($^O eq 'MSWin32') {
+    $config->add_static_libs('stdc++', 'winpthread', 'gcc');
+  }
   
   $config;
-
+  
 C<myre2.pl>
 
   use FindBin;
@@ -73,18 +72,14 @@ Google/RE2 C<2023-02-01>.
 
 If a new release exists, it will be upgraded.
 
-=head1 Config
+=head1 Config Definition
 
-The config of C<Resource::RE2>.
+The config definition of C<Resource::RE2>.
 
-  use strict;
-  use warnings;
-  use SPVM::Builder::Config;
-
-  my $config = SPVM::Builder::Config->new_cpp11(file => __FILE__);
-
+  my $config = SPVM::Builder::Config->new_cpp17(file => __FILE__);
+  
   $config->ext('cc');
-
+  
   my @source_files = qw(
     util/strutil.cc
     util/rune.cc
@@ -110,20 +105,16 @@ The config of C<Resource::RE2>.
     re2/unicode_groups.cc
     re2/compile.cc
   );
-
+  
   $config->add_source_files(@source_files);
-
-  $config;
 
 =head1 Required Libraries
 
-=over
+=head2 Windows
 
-=item * stdc++
-
-=item * pthread
-
-=back
+  if ($^O eq 'MSWin32') {
+    $config->add_static_libs('stdc++', 'winpthread', 'gcc');
+  }
 
 =head1 How to Create This Resource
 
