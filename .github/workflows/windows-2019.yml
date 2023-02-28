@@ -13,7 +13,8 @@ jobs:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v3
-      - run: cat $env:GITHUB_ENV
+      - name: Show PATH
+        run: echo $env:PATH
       - name: Perl version
         run: perl -V
       - name: Perl config
