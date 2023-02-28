@@ -81,10 +81,6 @@ lib/SPVM/Resource/RE2.native/src/.github/workflows/python.yml
 lib/SPVM/Resource/RE2.native/src/.gitignore
 lib/SPVM/Resource/RE2.native/src/.gitkeep
 lib/SPVM/Resource/RE2.native/src/AUTHORS
-lib/SPVM/Resource/RE2.native/src/benchlog/benchlog.c2
-lib/SPVM/Resource/RE2.native/src/benchlog/benchlog.mini
-lib/SPVM/Resource/RE2.native/src/benchlog/benchlog.r70
-lib/SPVM/Resource/RE2.native/src/benchlog/benchlog.wreck
 lib/SPVM/Resource/RE2.native/src/benchlog/benchplot.py
 lib/SPVM/Resource/RE2.native/src/benchlog/mktable
 lib/SPVM/Resource/RE2.native/src/BUILD
