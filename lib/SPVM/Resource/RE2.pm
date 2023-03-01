@@ -40,7 +40,7 @@ C<MyRE2.cpp>
 
 C<MyRE2.config>
   
-  my $config = SPVM::Builder::Config->new_cpp17(file => __FILE__);
+  my $config = SPVM::Builder::Config->new_cpp11(file => __FILE__);
   
   my $resource = $config->use_resource('Resource::RE2');
   
@@ -76,7 +76,7 @@ If a new release exists, it will be upgraded.
 
 The config definition of C<Resource::RE2>.
 
-  my $config = SPVM::Builder::Config->new_cpp17(file => __FILE__);
+  my $config = SPVM::Builder::Config->new_cpp11(file => __FILE__);
   
   $config->ext('cc');
   
