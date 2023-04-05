@@ -127,32 +127,30 @@ Recommended user config:
   
   $config->add_source_files(@source_files);
 
-=head1 How to Create This Resource
+=head1 How to Create Resource
 
-=head2 Getting Product
+=head2 Download
 
   mkdir -p original.tmp
   git clone https://github.com/google/re2.git original.tmp/re2
   git -C original.tmp/re2 checkout tags/2023-02-01 -b 2023-02-01
   git -C original.tmp/re2 branch
 
-=head2 Source Files
+=head2 Extracting Source Files
 
 All files of C<Google/RE2> is copied by the following steps into the C<src> directory.
 
   rsync -av --exclude='*.h' original.tmp/re2/ lib/SPVM/Resource/RE2.native/src/
 
-=head1 Header Files
+The source files that is used in the config are extracted by the following command.
+
+  find lib/SPVM/Resource/RE2.native/src/* | perl -p -e 's|^\Qlib/SPVM/Resource/RE2.native/src/||' | grep -P '(util|re2)/\w+\.cc$' | grep -v -P 'util/(test|benchmark|fuzz)\.cc$'
+
+=head1 Extracting Header Files
 
 Header files of C<Google/RE2> is copied into the C<include> directory by the following way.
 
   rsync -av --include='*/' --include='*.h' --exclude='*' original.tmp/re2/ lib/SPVM/Resource/RE2.native/include/
-
-=head2 Extracting Source Files
-
-The source files that is used in the config are extracted by the following command.
-
-  find lib/SPVM/Resource/RE2.native/src/* | perl -p -e 's|^\Qlib/SPVM/Resource/RE2.native/src/||' | grep -P '(util|re2)/\w+\.cc$' | grep -v -P 'util/(test|benchmark|fuzz)\.cc$'
 
 =head1 Repository
 
@@ -164,7 +162,7 @@ YuKi Kimoto C<kimoto.yuki@gmail.com>
 
 =head1 Copyright & License
 
-Copyright 2023-2023 YuKi Kimoto, all rights reserved.
+Copyright (c) 2023 Yuki Kimoto
 
-This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
+MIT License
+
