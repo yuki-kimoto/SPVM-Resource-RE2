@@ -16,17 +16,9 @@ SPVM::Resource::RE2 class in L<SPVM> is a L<resource|SPVM::Document::Resource> c
 
 MyClass.config:
   
-  my $config = SPVM::Builder::Config->new_cpp17(file => __FILE__);
+  my $config = SPVM::Builder::Config->new_cpp17;
+  
   my $resource = $config->use_resource('Resource::RE2');
-  
-  if ($^O eq 'MSWin32') {
-    $config->add_static_lib('stdc++', 'winpthread', 'gcc');
-  }
-  else {
-    $config->add_lib('stdc++');
-  }
-  
-  $config->add_ldflag('-pthread');
   
   $config;
 
@@ -60,36 +52,6 @@ C++
 =head1 Language Specification
 
 C++17
-
-=head1 Required Libraries
-
-Windows:
-
-=over 2
-
-=item * stdc++ (The static link is preffered)
-
-=item * winpthread (The static link is preffered)
-
-=item * gcc (The static link is preffered)
-
-=back
-
-Unix/Linux/Mac:
-
-=over 2
-
-=item * stdc++
-
-=back
-
-=head1 Required Linker Flags
-
-=over 2
-
-=item * -pthread
-
-=back
 
 =head1 Header Files
 
@@ -216,8 +178,6 @@ Unix/Linux/Mac:
 =head1 Compiler Flags
 
 =over 2
-
-=item * -pthread
 
 =item * -Wno-unused-parameter
 
