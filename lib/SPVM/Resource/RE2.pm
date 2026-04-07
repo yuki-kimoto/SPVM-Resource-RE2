@@ -49,7 +49,7 @@ L<Google/RE2 2023-02-01|https://github.com/google/re2/releases/tag/2023-02-01>
 
 C++
 
-=head1 Language Specification
+=head1 Language Standard
 
 C++17
 
