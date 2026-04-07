@@ -15,7 +15,7 @@ if ($meta) {
   $no_build_spvm_modules = 1;
 }
 
-my %spvm_requires = ('SPVM' => '0.990042');
+my %spvm_requires = ('SPVM' => '0.990155');
 WriteMakefile(
   NAME              => 'SPVM::Resource::RE2',
   VERSION_FROM      => 'lib/SPVM/Resource/RE2.pm',
