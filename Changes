@@ -1,3 +1,6 @@
+0.046 2025-04-27
+  [Changes]
+    * Minimalize source files.
 0.045 2025-04-27
   [Changes]
     * Change warning ccflags from ccflags to warn_ccflags to support MSVC.
