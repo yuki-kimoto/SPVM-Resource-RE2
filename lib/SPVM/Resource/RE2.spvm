@@ -2,5 +2,5 @@
 # MIT License
 
 class Resource::RE2 {
-  version "0.045";
+  version "0.046";
 }
