@@ -1,6 +1,6 @@
 package SPVM::Resource::RE2;
 
-our $VERSION = "0.046";
+our $VERSION = "0.047";
 
 1;
 
