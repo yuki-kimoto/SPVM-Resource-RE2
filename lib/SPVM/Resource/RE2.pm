@@ -183,6 +183,10 @@ C++17
 
 =item * -Wno-missing-field-initializers
 
+=item * -DNOMINMAX
+
+For MSVC.
+
 =back
 
 =head1 How to Create Resource
