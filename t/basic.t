@@ -2,7 +2,6 @@ use Test::More;
 
 use strict;
 use warnings;
-use FindBin;
 use lib "t/lib";
 
 use SPVM 'Resource::RE2';
